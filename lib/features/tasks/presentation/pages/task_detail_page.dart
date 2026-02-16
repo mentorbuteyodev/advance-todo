@@ -175,33 +175,19 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         final priorityColor = AppTheme.priorityColor(task.priority.index);
 
         return Scaffold(
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              // ── App Bar ──
-              SliverAppBar(
-                expandedHeight: 140,
-                pinned: true,
-                leading: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => context.pop(),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-                      color: Colors.white70,
-                    ),
-                    onPressed: () => _deleteTask(task),
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
+          backgroundColor: priorityColor,
+          body: Stack(
+            children: [
+              // ── Background Hero ──
+              // Kept from refactor to fix Hero Nesting Bug
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 300,
+                child: Hero(
+                  tag: 'priority_${task.id}',
+                  child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -213,409 +199,508 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(56, 8, 56, 0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Status chip
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(40),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                task.isCompleted
-                                    ? '✓ Completed'
-                                    : task.isOverdue
-                                    ? '⚠ Overdue'
-                                    : '● In Progress',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              task.title,
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ),
               ),
 
-              // ── Content ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Title Edit ──
-                      _SectionHeader(
-                        icon: Icons.edit_rounded,
-                        title: 'Title',
-                        onTap: () => setState(() => _isEditingTitle = true),
-                      ),
-                      const SizedBox(height: 8),
-                      if (_isEditingTitle)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _titleController,
-                                autofocus: true,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: 'Task title',
-                                  isDense: true,
-                                ),
-                                onSubmitted: (_) => _saveTitle(task),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.check_rounded),
-                              color: AppTheme.successColor,
-                              onPressed: () => _saveTitle(task),
-                            ),
-                          ],
-                        )
-                      else
-                        GestureDetector(
-                          onTap: () => setState(() => _isEditingTitle = true),
-                          child: Text(
-                            task.title,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // ── Description ──
-                      _SectionHeader(
-                        icon: Icons.notes_rounded,
-                        title: 'Description',
-                        onTap: () =>
-                            setState(() => _isEditingDescription = true),
-                      ),
-                      const SizedBox(height: 8),
-                      if (_isEditingDescription)
-                        Column(
-                          children: [
-                            TextField(
-                              controller: _descriptionController,
-                              autofocus: true,
-                              maxLines: 4,
-                              minLines: 2,
-                              decoration: const InputDecoration(
-                                hintText: 'Add a description...',
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: () => _saveDescription(task),
-                                icon: const Icon(Icons.check_rounded, size: 18),
-                                label: const Text('Save'),
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _isEditingDescription = true),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: theme.inputDecorationTheme.fillColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              task.description.isEmpty
-                                  ? 'Tap to add a description...'
-                                  : task.description,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: task.description.isEmpty
-                                    ? theme.colorScheme.onSurface.withAlpha(100)
-                                    : theme.colorScheme.onSurface,
-                                height: 1.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // ── Priority ──
-                      _SectionHeader(
-                        icon: Icons.flag_rounded,
-                        title: 'Priority',
-                      ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: TaskPriority.values.map((p) {
-                            final isSelected = task.priority == p;
-                            final color = AppTheme.priorityColor(p.index);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: GestureDetector(
-                                onTap: () => _changePriority(task, p),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? color.withAlpha(40)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? color
-                                          : theme.dividerColor,
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    p.name[0].toUpperCase() +
-                                        p.name.substring(1),
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? color
-                                          : theme.colorScheme.onSurface
-                                                .withAlpha(150),
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ── Due Date ──
-                      _SectionHeader(
-                        icon: Icons.calendar_today_rounded,
-                        title: 'Due Date',
-                      ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () => _changeDueDate(task),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: task.dueDate != null
-                                ? (task.isOverdue
-                                      ? AppTheme.errorColor.withAlpha(20)
-                                      : AppTheme.primaryColor.withAlpha(20))
-                                : theme.inputDecorationTheme.fillColor,
-                            borderRadius: BorderRadius.circular(14),
-                            border: task.dueDate != null
-                                ? Border.all(
-                                    color: task.isOverdue
-                                        ? AppTheme.errorColor.withAlpha(100)
-                                        : AppTheme.primaryColor.withAlpha(100),
-                                  )
-                                : null,
-                          ),
-                          child: Row(
+              Column(
+                children: [
+                  // ── Content Header (SafeArea) ──
+                  SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Navigation Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(
-                                Icons.schedule_rounded,
-                                size: 18,
-                                color: task.dueDate != null
-                                    ? (task.isOverdue
-                                          ? AppTheme.errorColor
-                                          : AppTheme.primaryColor)
-                                    : theme.colorScheme.onSurface.withAlpha(
-                                        120,
-                                      ),
+                              IconButton(
+                                onPressed: () => context.pop(),
+                                icon: const Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: Colors.white,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withAlpha(30),
+                                ),
                               ),
-                              const SizedBox(width: 10),
-                              Text(
-                                task.dueDate != null
-                                    ? DateFormat(
-                                        'EEEE, MMM d, yyyy · h:mm a',
-                                      ).format(task.dueDate!)
-                                    : 'Tap to set a due date',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: task.dueDate != null
-                                      ? (task.isOverdue
-                                            ? AppTheme.errorColor
-                                            : AppTheme.primaryColor)
-                                      : theme.colorScheme.onSurface.withAlpha(
-                                          120,
-                                        ),
-                                  fontWeight: task.dueDate != null
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
+                              IconButton(
+                                onPressed: () => _deleteTask(task),
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: Colors.white,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withAlpha(30),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
-                      // ── Tags ──
-                      _SectionHeader(icon: Icons.tag_rounded, title: 'Tags'),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: task.tags.map((tag) {
-                          return Chip(
-                            label: Text(tag),
-                            visualDensity: VisualDensity.compact,
-                            deleteIcon: const Icon(Icons.close, size: 14),
-                            onDeleted: () => _removeTag(task, tag),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _tagController,
-                              decoration: const InputDecoration(
-                                hintText: 'Add a tag...',
-                                prefixIcon: Icon(Icons.tag_rounded, size: 18),
-                                isDense: true,
+                          // Status Indication
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(50),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              task.isCompleted
+                                  ? '✓ Completed'
+                                  : task.isOverdue
+                                  ? '⚠ Overdue'
+                                  : '● In Progress',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              onSubmitted: (_) => _addTag(task),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () => _addTag(task),
-                            icon: const Icon(Icons.add_rounded, size: 20),
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor.withAlpha(
-                                20,
+                          const SizedBox(height: 12),
+
+                          // Title Hero (Sibling to background hero)
+                          Hero(
+                            tag: 'title_${task.id}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Text(
+                                task.title,
+                                style: theme.textTheme.headlineLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.1,
+                                  letterSpacing: -0.5,
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              foregroundColor: AppTheme.primaryColor,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-
-                      // ── Subtasks ──
-                      _SectionHeader(
-                        icon: Icons.checklist_rounded,
-                        title:
-                            'Subtasks (${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length})',
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Subtask progress bar
-                      if (task.subtasks.isNotEmpty) ...[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: task.subtasks.isEmpty
-                                ? 0
-                                : task.subtasks
-                                          .where((s) => s.isCompleted)
-                                          .length /
-                                      task.subtasks.length,
-                            minHeight: 6,
-                            backgroundColor: AppTheme.primaryColor.withAlpha(
-                              30,
-                            ),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppTheme.successColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-
-                      // Subtask list
-                      ...task.subtasks.map(
-                        (subtask) => _SubtaskItem(
-                          subtask: subtask,
-                          onToggle: () => context.read<TaskBloc>().add(
-                            ToggleTaskStatus(subtask),
-                          ),
-                          onDelete: () => context.read<TaskBloc>().add(
-                            DeleteTask(subtask.id),
-                          ),
-                        ),
-                      ),
-
-                      // Add subtask input
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _subtaskController,
-                              decoration: const InputDecoration(
-                                hintText: 'Add a subtask...',
-                                prefixIcon: Icon(Icons.add_rounded, size: 20),
-                                isDense: true,
-                              ),
-                              onSubmitted: (_) => _addSubtask(task),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () => _addSubtask(task),
-                            icon: const Icon(Icons.send_rounded, size: 20),
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor.withAlpha(
-                                20,
-                              ),
-                              foregroundColor: AppTheme.primaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 100),
-                    ],
+                    ),
                   ),
-                ),
+
+                  // ── Floating Sheet with Original Body Content ──
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: theme.scaffoldBackgroundColor,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(30),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(30),
+                        ),
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── RESTORED ORIGINAL CONTENT DESIGN ──
+
+                              // Title Edit
+                              _SectionHeader(
+                                icon: Icons.edit_rounded,
+                                title: 'Title',
+                                onTap: () =>
+                                    setState(() => _isEditingTitle = true),
+                              ),
+                              const SizedBox(height: 8),
+                              if (_isEditingTitle)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _titleController,
+                                        autofocus: true,
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                        decoration: const InputDecoration(
+                                          hintText: 'Task title',
+                                          isDense: true,
+                                        ),
+                                        onSubmitted: (_) => _saveTitle(task),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.check_rounded),
+                                      color: AppTheme.successColor,
+                                      onPressed: () => _saveTitle(task),
+                                    ),
+                                  ],
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _isEditingTitle = true),
+                                  child: Text(
+                                    task.title,
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 24),
+
+                              // Description
+                              _SectionHeader(
+                                icon: Icons.notes_rounded,
+                                title: 'Description',
+                                onTap: () => setState(
+                                  () => _isEditingDescription = true,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (_isEditingDescription)
+                                Column(
+                                  children: [
+                                    TextField(
+                                      controller: _descriptionController,
+                                      autofocus: true,
+                                      maxLines: 4,
+                                      minLines: 2,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Add a description...',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: () => _saveDescription(task),
+                                        icon: const Icon(
+                                          Icons.check_rounded,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Save'),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () => setState(
+                                    () => _isEditingDescription = true,
+                                  ),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          theme.inputDecorationTheme.fillColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      task.description.isEmpty
+                                          ? 'Tap to add a description...'
+                                          : task.description,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: task.description.isEmpty
+                                                ? theme.colorScheme.onSurface
+                                                      .withAlpha(100)
+                                                : theme.colorScheme.onSurface,
+                                            height: 1.5,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 24),
+
+                              // Priority
+                              _SectionHeader(
+                                icon: Icons.flag_rounded,
+                                title: 'Priority',
+                              ),
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: TaskPriority.values.map((p) {
+                                    final isSelected = task.priority == p;
+                                    final color = AppTheme.priorityColor(
+                                      p.index,
+                                    );
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: GestureDetector(
+                                        onTap: () => _changePriority(task, p),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 200,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? color.withAlpha(40)
+                                                : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? color
+                                                  : theme.dividerColor,
+                                              width: isSelected ? 2 : 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            p.name[0].toUpperCase() +
+                                                p.name.substring(1),
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? color
+                                                  : theme.colorScheme.onSurface
+                                                        .withAlpha(150),
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Due Date
+                              _SectionHeader(
+                                icon: Icons.calendar_today_rounded,
+                                title: 'Due Date',
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () => _changeDueDate(task),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: task.dueDate != null
+                                        ? (task.isOverdue
+                                              ? AppTheme.errorColor.withAlpha(
+                                                  20,
+                                                )
+                                              : AppTheme.primaryColor.withAlpha(
+                                                  20,
+                                                ))
+                                        : theme.inputDecorationTheme.fillColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: task.dueDate != null
+                                        ? Border.all(
+                                            color: task.isOverdue
+                                                ? AppTheme.errorColor.withAlpha(
+                                                    100,
+                                                  )
+                                                : AppTheme.primaryColor
+                                                      .withAlpha(100),
+                                          )
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.schedule_rounded,
+                                        size: 18,
+                                        color: task.dueDate != null
+                                            ? (task.isOverdue
+                                                  ? AppTheme.errorColor
+                                                  : AppTheme.primaryColor)
+                                            : theme.colorScheme.onSurface
+                                                  .withAlpha(120),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        task.dueDate != null
+                                            ? DateFormat(
+                                                'EEEE, MMM d, yyyy • h:mm a',
+                                              ).format(task.dueDate!)
+                                            : 'Tap to set a due date',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: task.dueDate != null
+                                                  ? (task.isOverdue
+                                                        ? AppTheme.errorColor
+                                                        : AppTheme.primaryColor)
+                                                  : theme.colorScheme.onSurface
+                                                        .withAlpha(120),
+                                              fontWeight: task.dueDate != null
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Tags
+                              _SectionHeader(
+                                icon: Icons.tag_rounded,
+                                title: 'Tags',
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: task.tags.map((tag) {
+                                  return Chip(
+                                    label: Text(tag),
+                                    visualDensity: VisualDensity.compact,
+                                    deleteIcon: const Icon(
+                                      Icons.close,
+                                      size: 14,
+                                    ),
+                                    onDeleted: () => _removeTag(task, tag),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _tagController,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Add a tag...',
+                                        prefixIcon: Icon(
+                                          Icons.tag_rounded,
+                                          size: 18,
+                                        ),
+                                        isDense: true,
+                                      ),
+                                      onSubmitted: (_) => _addTag(task),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: () => _addTag(task),
+                                    icon: const Icon(
+                                      Icons.add_rounded,
+                                      size: 20,
+                                    ),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryColor
+                                          .withAlpha(20),
+                                      foregroundColor: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+
+                              // Subtasks
+                              _SectionHeader(
+                                icon: Icons.checklist_rounded,
+                                title:
+                                    'Subtasks (${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length})',
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Subtask progress bar
+                              if (task.subtasks.isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: task.subtasks.isEmpty
+                                        ? 0
+                                        : task.subtasks
+                                                  .where((s) => s.isCompleted)
+                                                  .length /
+                                              task.subtasks.length,
+                                    minHeight: 6,
+                                    backgroundColor: AppTheme.primaryColor
+                                        .withAlpha(30),
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                          AppTheme.successColor,
+                                        ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+
+                              // Subtask list
+                              ...task.subtasks.map(
+                                (subtask) => _SubtaskItem(
+                                  subtask: subtask,
+                                  onToggle: () => context.read<TaskBloc>().add(
+                                    ToggleTaskStatus(subtask),
+                                  ),
+                                  onDelete: () => context.read<TaskBloc>().add(
+                                    DeleteTask(subtask.id),
+                                  ),
+                                ),
+                              ),
+
+                              // Add subtask input
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _subtaskController,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Add a subtask...',
+                                        prefixIcon: Icon(
+                                          Icons.add_rounded,
+                                          size: 20,
+                                        ),
+                                        isDense: true,
+                                      ),
+                                      onSubmitted: (_) => _addSubtask(task),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: () => _addSubtask(task),
+                                    icon: const Icon(
+                                      Icons.send_rounded,
+                                      size: 20,
+                                    ),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryColor
+                                          .withAlpha(20),
+                                      foregroundColor: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
 
-          // ── Toggle Complete FAB ──
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () =>
                 context.read<TaskBloc>().add(ToggleTaskStatus(task)),
@@ -634,7 +719,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 }
 
-// ── Section Header ──
+// ── Shared Widgets (Restored from Original) ──
+
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -672,7 +758,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Subtask Item ──
 class _SubtaskItem extends StatelessWidget {
   final TaskEntity subtask;
   final VoidCallback onToggle;

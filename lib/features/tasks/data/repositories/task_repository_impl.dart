@@ -1,53 +1,216 @@
-// Task Repository Implementation
-// Bridges the Domain layer interface with the Data layer.
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/task_entity.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../datasources/task_local_data_source.dart';
+import '../datasources/remote_task_data_source.dart';
 import '../models/task_model.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
   final TaskLocalDataSource localDataSource;
+  final RemoteTaskDataSource remoteDataSource;
+  StreamSubscription? _remoteSubscription;
+  bool _isSyncing = false;
 
-  TaskRepositoryImpl({required this.localDataSource});
+  TaskRepositoryImpl({
+    required this.localDataSource,
+    required this.remoteDataSource,
+  }) {
+    _initRemoteListener();
+  }
+
+  // ── Remote → Local Listener ──────────────────────────────────
+  void _initRemoteListener() {
+    _remoteSubscription = remoteDataSource.getTasksStream().listen((
+      remoteTasks,
+    ) async {
+      if (_isSyncing) return; // Skip during active sync to avoid loops
+      for (final remoteTask in remoteTasks) {
+        final localTask = await localDataSource.getTaskById(remoteTask.id);
+        if (localTask == null) {
+          // New from remote, add locally
+          await localDataSource.addTask(remoteTask);
+        } else if (!localTask.pendingSync &&
+            remoteTask.updatedAt.isAfter(localTask.updatedAt)) {
+          // Remote is newer AND local has no pending changes → update
+          await localDataSource.updateTask(remoteTask);
+        }
+        // If localTask.pendingSync is true, keep local version (will push on next sync)
+      }
+    }, onError: (e) => debugPrint('⚠️ Remote sync listener error: $e'));
+  }
+
+  // ── Full Bidirectional Sync ──────────────────────────────────
+  @override
+  Future<void> syncNow() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    debugPrint('🔄 Starting full sync...');
+
+    try {
+      // 1. Push pending local changes to remote
+      final pendingTasks = await localDataSource.getPendingSyncTasks();
+      for (final task in pendingTasks) {
+        try {
+          if (task.isDeleted) {
+            // Soft-deleted locally → delete from remote and purge
+            await remoteDataSource.deleteTask(task.id);
+            await localDataSource.purgeTask(task.id);
+            debugPrint('🗑️ Synced deletion: ${task.id}');
+          } else {
+            // Push upsert to remote
+            final syncedTask = TaskModel(
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              statusIndex: task.statusIndex,
+              priorityIndex: task.priorityIndex,
+              createdAt: task.createdAt,
+              updatedAt: task.updatedAt,
+              dueDate: task.dueDate,
+              tags: task.tags,
+              parentId: task.parentId,
+              isRecurring: task.isRecurring,
+              recurringPattern: task.recurringPattern,
+              sortOrder: task.sortOrder,
+              isDeleted: false,
+              pendingSync: false,
+            );
+            await remoteDataSource.saveTask(syncedTask);
+            // Clear pending flag locally
+            await localDataSource.updateTask(syncedTask);
+            debugPrint('⬆️ Pushed: ${task.id}');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to sync ${task.id}: $e');
+          // Leave pendingSync = true so it retries next time
+        }
+      }
+
+      // 2. Pull remote tasks and merge into local
+      final remoteTasks = await remoteDataSource.getTasks();
+      final localTasks = await localDataSource.getAllTasksRaw();
+      final localMap = {for (final t in localTasks) t.id: t};
+
+      for (final remoteTask in remoteTasks) {
+        final localTask = localMap[remoteTask.id];
+        if (localTask == null) {
+          // New from remote
+          await localDataSource.addTask(remoteTask);
+        } else if (!localTask.pendingSync &&
+            remoteTask.updatedAt.isAfter(localTask.updatedAt)) {
+          // Remote is newer, local has no pending changes
+          await localDataSource.updateTask(remoteTask);
+        }
+        localMap.remove(remoteTask.id);
+      }
+
+      // 3. Remaining in localMap are tasks not on remote
+      //    — they were either created offline (pendingSync) or deleted remotely
+      for (final orphan in localMap.values) {
+        if (!orphan.pendingSync && !orphan.isDeleted) {
+          // Not pending and not in remote → was deleted remotely
+          await localDataSource.purgeTask(orphan.id);
+          debugPrint('🧹 Purged locally (deleted remotely): ${orphan.id}');
+        }
+      }
+
+      debugPrint('✅ Sync complete');
+    } catch (e) {
+      debugPrint('❌ Sync error: $e');
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  void dispose() {
+    _remoteSubscription?.cancel();
+  }
+
+  // ── CRUD Operations ──────────────────────────────────────────
 
   @override
   Future<List<TaskEntity>> getTasks({String? parentId}) async {
     final models = await localDataSource.getTasks(parentId: parentId);
-    final entities = <TaskEntity>[];
-    for (final model in models) {
-      final subtaskModels = await localDataSource.getTasks(parentId: model.id);
-      final subtasks = subtaskModels.map((s) => s.toEntity()).toList();
-      entities.add(model.toEntity(subtasks: subtasks));
-    }
-    entities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    return entities;
+    return _mapModelsToEntities(models);
   }
 
   @override
   Future<TaskEntity?> getTaskById(String id) async {
     final model = await localDataSource.getTaskById(id);
     if (model == null) return null;
-    final subtaskModels = await localDataSource.getTasks(parentId: id);
-    final subtasks = subtaskModels.map((s) => s.toEntity()).toList();
-    return model.toEntity(subtasks: subtasks);
+    return _mapModelToEntity(model);
   }
 
   @override
   Future<void> addTask(TaskEntity task) async {
-    final model = TaskModel.fromEntity(task);
+    final model = TaskModel.fromEntity(task.copyWith(pendingSync: true));
     await localDataSource.addTask(model);
+    try {
+      await remoteDataSource.saveTask(model);
+      // Remote succeeded → clear pendingSync flag
+      final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
+      await localDataSource.updateTask(synced);
+    } catch (e) {
+      debugPrint('⚠️ Remote add failed (queued): $e');
+      // Stays pendingSync = true → will push on next syncNow()
+    }
   }
 
   @override
   Future<void> updateTask(TaskEntity task) async {
-    final model = TaskModel.fromEntity(task);
+    final model = TaskModel.fromEntity(task.copyWith(pendingSync: true));
     await localDataSource.updateTask(model);
+    try {
+      await remoteDataSource.saveTask(model);
+      final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
+      await localDataSource.updateTask(synced);
+    } catch (e) {
+      debugPrint('⚠️ Remote update failed (queued): $e');
+    }
   }
 
   @override
   Future<void> deleteTask(String id) async {
-    await localDataSource.deleteTask(id);
+    // Soft delete: mark as deleted + pendingSync
+    final existing = await localDataSource.getTaskById(id);
+    if (existing != null) {
+      final softDeleted = TaskModel(
+        id: existing.id,
+        title: existing.title,
+        description: existing.description,
+        statusIndex: existing.statusIndex,
+        priorityIndex: existing.priorityIndex,
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now(),
+        dueDate: existing.dueDate,
+        tags: existing.tags,
+        parentId: existing.parentId,
+        isRecurring: existing.isRecurring,
+        recurringPattern: existing.recurringPattern,
+        sortOrder: existing.sortOrder,
+        isDeleted: true,
+        pendingSync: true,
+      );
+      await localDataSource.updateTask(softDeleted);
+
+      // Also soft-delete subtasks
+      final subtasks = await localDataSource.getTasks(parentId: id);
+      for (final sub in subtasks) {
+        await deleteTask(sub.id);
+      }
+    }
+
+    // Try to delete remotely immediately
+    try {
+      await remoteDataSource.deleteTask(id);
+      // If remote delete succeeded, purge locally
+      await localDataSource.purgeTask(id);
+    } catch (e) {
+      debugPrint('⚠️ Remote delete failed (queued): $e');
+      // Will purge on next syncNow()
+    }
   }
 
   @override
@@ -93,17 +256,27 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Stream<List<TaskEntity>> watchTasks() {
     return localDataSource.watchTasks().asyncMap((models) async {
-      final topLevel = models.where((m) => m.parentId == null).toList();
-      final entities = <TaskEntity>[];
-      for (final model in topLevel) {
-        final subtaskModels = models
-            .where((m) => m.parentId == model.id)
-            .toList();
-        final subtasks = subtaskModels.map((s) => s.toEntity()).toList();
-        entities.add(model.toEntity(subtasks: subtasks));
-      }
-      entities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-      return entities;
+      return _mapModelsToEntities(models);
     });
+  }
+
+  // ── Helper Mapping Methods ──
+
+  Future<List<TaskEntity>> _mapModelsToEntities(List<TaskModel> models) async {
+    final topLevel = models.where((m) => m.parentId == null).toList();
+    final entities = <TaskEntity>[];
+
+    for (final model in topLevel) {
+      entities.add(await _mapModelToEntity(model));
+    }
+
+    entities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return entities;
+  }
+
+  Future<TaskEntity> _mapModelToEntity(TaskModel model) async {
+    final subtaskModels = await localDataSource.getTasks(parentId: model.id);
+    final subtasks = subtaskModels.map((s) => s.toEntity()).toList();
+    return model.toEntity(subtasks: subtasks);
   }
 }

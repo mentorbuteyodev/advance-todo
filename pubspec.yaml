@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # UI
   cupertino_icons: ^1.0.8
@@ -38,6 +40,11 @@ dependencies:
   path_provider: any
   flutter_local_notifications: any
   timezone: any
+
+  # Firebase
+  firebase_core: any
+  firebase_auth: any
+  cloud_firestore: any
 
 dev_dependencies:
   flutter_test:

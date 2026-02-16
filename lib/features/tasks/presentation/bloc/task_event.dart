@@ -19,6 +19,8 @@ class AddTask extends TaskEvent {
   final DateTime? dueDate;
   final List<String> tags;
   final String? parentId;
+  final bool isRecurring;
+  final String? recurringPattern;
 
   const AddTask({
     required this.title,
@@ -27,6 +29,8 @@ class AddTask extends TaskEvent {
     this.dueDate,
     this.tags = const [],
     this.parentId,
+    this.isRecurring = false,
+    this.recurringPattern,
   });
 
   @override
@@ -37,6 +41,8 @@ class AddTask extends TaskEvent {
     dueDate,
     tags,
     parentId,
+    isRecurring,
+    recurringPattern,
   ];
 }
 
@@ -84,6 +90,15 @@ class FilterTasks extends TaskEvent {
 
   @override
   List<Object?> get props => [filter];
+}
+
+class SearchQueryChanged extends TaskEvent {
+  final String query;
+
+  const SearchQueryChanged(this.query);
+
+  @override
+  List<Object?> get props => [query];
 }
 
 enum TaskFilter { all, today, upcoming, completed }

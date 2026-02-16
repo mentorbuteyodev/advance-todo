@@ -47,6 +47,12 @@ class TaskModel extends HiveObject {
   @HiveField(12)
   final int sortOrder;
 
+  @HiveField(13)
+  final bool isDeleted;
+
+  @HiveField(14)
+  final bool pendingSync;
+
   TaskModel({
     required this.id,
     required this.title,
@@ -61,6 +67,8 @@ class TaskModel extends HiveObject {
     this.isRecurring = false,
     this.recurringPattern,
     this.sortOrder = 0,
+    this.isDeleted = false,
+    this.pendingSync = false,
   });
 
   /// Convert from Domain Entity to Data Model.
@@ -79,6 +87,8 @@ class TaskModel extends HiveObject {
       isRecurring: entity.isRecurring,
       recurringPattern: entity.recurringPattern,
       sortOrder: entity.sortOrder,
+      isDeleted: entity.isDeleted,
+      pendingSync: entity.pendingSync,
     );
   }
 
@@ -99,6 +109,50 @@ class TaskModel extends HiveObject {
       isRecurring: isRecurring,
       recurringPattern: recurringPattern,
       sortOrder: sortOrder,
+      isDeleted: isDeleted,
+      pendingSync: pendingSync,
+    );
+  }
+
+  // ── JSON Serialization ──
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'statusIndex': statusIndex,
+      'priorityIndex': priorityIndex,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'dueDate': dueDate?.toIso8601String(),
+      'tags': tags,
+      'parentId': parentId,
+      'isRecurring': isRecurring,
+      'recurringPattern': recurringPattern,
+      'sortOrder': sortOrder,
+      'isDeleted': isDeleted,
+    };
+  }
+
+  factory TaskModel.fromJson(Map<String, dynamic> json) {
+    return TaskModel(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      description: json['description'] as String? ?? '',
+      statusIndex: json['statusIndex'] as int? ?? 0,
+      priorityIndex: json['priorityIndex'] as int? ?? 0,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      dueDate: json['dueDate'] != null
+          ? DateTime.parse(json['dueDate'] as String)
+          : null,
+      tags: List<String>.from(json['tags'] as List? ?? []),
+      parentId: json['parentId'] as String?,
+      isRecurring: json['isRecurring'] as bool? ?? false,
+      recurringPattern: json['recurringPattern'] as String?,
+      sortOrder: json['sortOrder'] as int? ?? 0,
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      pendingSync: false, // Remote data is already synced
     );
   }
 }

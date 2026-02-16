@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/services/notification_service.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/task_entity.dart';
 import '../../domain/repositories/task_repository.dart';
 import 'task_event.dart';
@@ -14,11 +15,17 @@ import 'task_state.dart';
 class TaskBloc extends Bloc<TaskEvent, TaskState> {
   final TaskRepository repository;
   final NotificationService notificationService;
+  final SettingsCubit settingsCubit;
   final Uuid _uuid = const Uuid();
   StreamSubscription? _taskSubscription;
 
-  TaskBloc({required this.repository, required this.notificationService})
-    : super(TaskInitial()) {
+  bool get _notificationsEnabled => settingsCubit.state.notificationsEnabled;
+
+  TaskBloc({
+    required this.repository,
+    required this.notificationService,
+    required this.settingsCubit,
+  }) : super(TaskInitial()) {
     on<LoadTasks>(_onLoadTasks);
     on<AddTask>(_onAddTask);
     on<UpdateTask>(_onUpdateTask);
@@ -26,6 +33,7 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
     on<DeleteTask>(_onDeleteTask);
     on<AddSubtask>(_onAddSubtask);
     on<FilterTasks>(_onFilterTasks);
+    on<SearchQueryChanged>(_onSearchQueryChanged);
   }
 
   Future<void> _onLoadTasks(LoadTasks event, Emitter<TaskState> emit) async {
@@ -34,17 +42,24 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
       // Subscribe to the reactive stream
       await _taskSubscription?.cancel();
 
+      // Trigger background sync (non-blocking)
+      repository.syncNow();
+
       await emit.forEach<List<TaskEntity>>(
         repository.watchTasks(),
         onData: (tasks) {
           final currentFilter = state is TaskLoaded
               ? (state as TaskLoaded).activeFilter
               : TaskFilter.all;
-          final filtered = _applyFilter(tasks, currentFilter);
+          final currentQuery = state is TaskLoaded
+              ? (state as TaskLoaded).searchQuery
+              : '';
+          final filtered = _applyFilter(tasks, currentFilter, currentQuery);
           return TaskLoaded(
             tasks: tasks,
             filteredTasks: filtered,
             activeFilter: currentFilter,
+            searchQuery: currentQuery,
             completedCount: tasks.where((t) => t.isCompleted).length,
             totalCount: tasks.length,
           );
@@ -71,11 +86,13 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
         createdAt: now,
         updatedAt: now,
         sortOrder: state is TaskLoaded ? (state as TaskLoaded).tasks.length : 0,
+        isRecurring: event.isRecurring,
+        recurringPattern: event.recurringPattern,
       );
       await repository.addTask(task);
 
-      // Schedule notification if due date is set
-      if (event.dueDate != null) {
+      // Schedule notification if due date is set and notifications are enabled
+      if (event.dueDate != null && _notificationsEnabled) {
         await notificationService.scheduleTaskReminder(
           taskId: taskId,
           title: event.title,
@@ -99,8 +116,8 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
         event.task.copyWith(updatedAt: DateTime.now()),
       );
 
-      // Reschedule notification if due date changed
-      if (event.task.dueDate != null) {
+      // Reschedule notification if due date changed and notifications are enabled
+      if (event.task.dueDate != null && _notificationsEnabled) {
         await notificationService.scheduleTaskReminder(
           taskId: event.task.id,
           title: event.task.title,
@@ -119,26 +136,71 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
     Emitter<TaskState> emit,
   ) async {
     try {
-      final newStatus = event.task.isCompleted
-          ? TaskStatus.todo
-          : TaskStatus.completed;
+      final isCompleting = !event.task.isCompleted;
+      final newStatus = isCompleting ? TaskStatus.completed : TaskStatus.todo;
+
       await repository.updateTask(
         event.task.copyWith(status: newStatus, updatedAt: DateTime.now()),
       );
 
-      // Cancel notification when completed, reschedule when reopened
-      if (newStatus == TaskStatus.completed) {
+      if (isCompleting) {
         await notificationService.cancelTaskReminder(event.task.id);
-      } else if (event.task.dueDate != null) {
-        await notificationService.scheduleTaskReminder(
-          taskId: event.task.id,
-          title: event.task.title,
-          dueDate: event.task.dueDate!,
-        );
+
+        // Handle Recurrence
+        if (event.task.isRecurring && event.task.dueDate != null) {
+          final nextDueDate = _calculateNextDueDate(
+            event.task.dueDate!,
+            event.task.recurringPattern,
+          );
+
+          if (nextDueDate != null) {
+            final nextTask = event.task.copyWith(
+              id: _uuid.v4(),
+              status: TaskStatus.todo,
+              dueDate: nextDueDate,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            await repository.addTask(nextTask);
+
+            // Schedule notification for the new task
+            if (_notificationsEnabled) {
+              await notificationService.scheduleTaskReminder(
+                taskId: nextTask.id,
+                title: nextTask.title,
+                dueDate: nextDueDate,
+              );
+            }
+          }
+        }
+      } else {
+        // Reopened
+        if (event.task.dueDate != null && _notificationsEnabled) {
+          await notificationService.scheduleTaskReminder(
+            taskId: event.task.id,
+            title: event.task.title,
+            dueDate: event.task.dueDate!,
+          );
+        }
       }
     } catch (e) {
       emit(TaskError(e.toString()));
     }
+  }
+
+  DateTime? _calculateNextDueDate(DateTime current, String? pattern) {
+    if (pattern == 'daily') return current.add(const Duration(days: 1));
+    if (pattern == 'weekly') return current.add(const Duration(days: 7));
+    if (pattern == 'monthly') {
+      return DateTime(
+        current.year,
+        current.month + 1,
+        current.day,
+        current.hour,
+        current.minute,
+      );
+    }
+    return null;
   }
 
   Future<void> _onDeleteTask(DeleteTask event, Emitter<TaskState> emit) async {
@@ -170,12 +232,17 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
   void _onFilterTasks(FilterTasks event, Emitter<TaskState> emit) {
     if (state is TaskLoaded) {
       final currentState = state as TaskLoaded;
-      final filtered = _applyFilter(currentState.tasks, event.filter);
+      final filtered = _applyFilter(
+        currentState.tasks,
+        event.filter,
+        currentState.searchQuery,
+      );
       emit(
         TaskLoaded(
           tasks: currentState.tasks,
           filteredTasks: filtered,
           activeFilter: event.filter,
+          searchQuery: currentState.searchQuery,
           completedCount: currentState.completedCount,
           totalCount: currentState.totalCount,
         ),
@@ -183,16 +250,43 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
     }
   }
 
-  List<TaskEntity> _applyFilter(List<TaskEntity> tasks, TaskFilter filter) {
+  void _onSearchQueryChanged(
+    SearchQueryChanged event,
+    Emitter<TaskState> emit,
+  ) {
+    if (state is TaskLoaded) {
+      final currentState = state as TaskLoaded;
+      final filtered = _applyFilter(
+        currentState.tasks,
+        currentState.activeFilter,
+        event.query,
+      );
+      emit(
+        TaskLoaded(
+          tasks: currentState.tasks,
+          filteredTasks: filtered,
+          activeFilter: currentState.activeFilter,
+          searchQuery: event.query,
+          completedCount: currentState.completedCount,
+          totalCount: currentState.totalCount,
+        ),
+      );
+    }
+  }
+
+  List<TaskEntity> _applyFilter(
+    List<TaskEntity> tasks,
+    TaskFilter filter,
+    String query,
+  ) {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
 
-    switch (filter) {
-      case TaskFilter.all:
-        return tasks.where((t) => !t.isCompleted).toList();
-      case TaskFilter.today:
-        return tasks
+    var filteredTasks = switch (filter) {
+      TaskFilter.all => tasks.where((t) => !t.isCompleted).toList(),
+      TaskFilter.today =>
+        tasks
             .where(
               (t) =>
                   !t.isCompleted &&
@@ -202,9 +296,9 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
                   ) &&
                   t.dueDate!.isBefore(todayEnd),
             )
-            .toList();
-      case TaskFilter.upcoming:
-        return tasks
+            .toList(),
+      TaskFilter.upcoming =>
+        tasks
             .where(
               (t) =>
                   !t.isCompleted &&
@@ -212,10 +306,19 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
                   t.dueDate!.isAfter(now),
             )
             .toList()
-          ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
-      case TaskFilter.completed:
-        return tasks.where((t) => t.isCompleted).toList();
+          ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!)),
+      TaskFilter.completed => tasks.where((t) => t.isCompleted).toList(),
+    };
+
+    if (query.isNotEmpty) {
+      final lowerQuery = query.toLowerCase();
+      filteredTasks = filteredTasks.where((t) {
+        return t.title.toLowerCase().contains(lowerQuery) ||
+            t.description.toLowerCase().contains(lowerQuery);
+      }).toList();
     }
+
+    return filteredTasks;
   }
 
   @override

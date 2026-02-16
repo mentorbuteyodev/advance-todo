@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:todo_test/core/services/notification_service.dart';
+import 'package:todo_test/features/settings/presentation/bloc/settings_cubit.dart';
 import 'package:todo_test/features/tasks/domain/entities/task_entity.dart';
 import 'package:todo_test/features/tasks/domain/repositories/task_repository.dart';
 import 'package:todo_test/features/tasks/presentation/bloc/task_bloc.dart';
@@ -22,6 +23,7 @@ class FakeTaskEntity extends Fake implements TaskEntity {}
 void main() {
   late MockTaskRepository mockRepo;
   late MockNotificationService mockNotifications;
+  late SettingsCubit settingsCubit;
   late TaskBloc taskBloc;
 
   final tTask = TaskEntity(
@@ -40,9 +42,11 @@ void main() {
   setUp(() {
     mockRepo = MockTaskRepository();
     mockNotifications = MockNotificationService();
+    settingsCubit = SettingsCubit();
     taskBloc = TaskBloc(
       repository: mockRepo,
       notificationService: mockNotifications,
+      settingsCubit: settingsCubit,
     );
 
     // Default stub for notification methods
@@ -76,6 +80,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       act: (bloc) => bloc.add(LoadTasks()),
@@ -92,6 +97,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       act: (bloc) => bloc.add(LoadTasks()),
@@ -111,6 +117,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -135,6 +142,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -159,6 +167,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -182,6 +191,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
+          settingsCubit: settingsCubit,
         );
       },
       seed: () => TaskLoaded(
