@@ -140,7 +140,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (_isAutoParsing) {
         final nlp = NLPService.parse(title);
         title = nlp.title;
-        if (dueDate == null) dueDate = nlp.dueDate;
+        dueDate ??= nlp.dueDate;
         if (priority == TaskPriority.none) priority = nlp.priority;
         for (final tag in nlp.tags) {
           if (!tags.contains(tag)) tags.add(tag);

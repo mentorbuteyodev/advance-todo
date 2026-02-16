@@ -671,8 +671,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                   ),
                                 }.where((t) => !task.tags.contains(t)).toList();
 
-                                if (allSuggestedTags.isEmpty)
+                                if (allSuggestedTags.isEmpty) {
                                   return const SizedBox.shrink();
+                                }
 
                                 return _buildAISuggestionSection(
                                   theme,
