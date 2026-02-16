@@ -1,5 +1,4 @@
-// Main entry point for TaskFlow application.
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -24,34 +23,52 @@ import 'firebase_options.dart';
 import 'injection.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-  // System UI
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
+      // System UI
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+      );
+
+      // Initialize Firebase
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // Initialize Hive
+      await Hive.initFlutter();
+      Hive.registerAdapter(TaskModelAdapter());
+
+      // Initialize DI
+      await configureDependencies();
+
+      // Initialize Notifications (non-fatal if plugin not available)
+      try {
+        await sl<NotificationService>().init();
+      } catch (e) {
+        debugPrint('⚠️ Notification init failed: $e');
+      }
+
+      // Global Error Handling
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        // TODO: Send to Crashlytics or Sentry
+        debugPrint('💥 FlutterError: ${details.exception}');
+      };
+
+      runApp(const TaskFlowApp());
+    },
+    (error, stackTrace) {
+      // Catch-all for async errors
+      debugPrint('💥 Global Error: $error');
+      debugPrint('Stack: $stackTrace');
+    },
   );
-
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Initialize Hive
-  await Hive.initFlutter();
-  Hive.registerAdapter(TaskModelAdapter());
-
-  // Initialize DI
-  await configureDependencies();
-
-  // Initialize Notifications (non-fatal if plugin not available)
-  try {
-    await sl<NotificationService>().init();
-  } catch (e) {
-    debugPrint('⚠️ Notification init failed: $e');
-  }
-
-  runApp(const TaskFlowApp());
 }
 
 class TaskFlowApp extends StatefulWidget {

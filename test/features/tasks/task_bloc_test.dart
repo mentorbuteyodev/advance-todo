@@ -18,12 +18,15 @@ class MockTaskRepository extends Mock implements TaskRepository {}
 
 class MockNotificationService extends Mock implements NotificationService {}
 
+class MockSettingsCubit extends MockCubit<SettingsState>
+    implements SettingsCubit {}
+
 class FakeTaskEntity extends Fake implements TaskEntity {}
 
 void main() {
   late MockTaskRepository mockRepo;
   late MockNotificationService mockNotifications;
-  late SettingsCubit settingsCubit;
+  late MockSettingsCubit mockSettingsCubit;
   late TaskBloc taskBloc;
 
   final tTask = TaskEntity(
@@ -42,11 +45,18 @@ void main() {
   setUp(() {
     mockRepo = MockTaskRepository();
     mockNotifications = MockNotificationService();
-    settingsCubit = SettingsCubit();
+    mockSettingsCubit = MockSettingsCubit();
+
+    // Default stub for SettingsCubit state
+    when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
+
+    // Default stub for syncNow
+    when(() => mockRepo.syncNow()).thenAnswer((_) async {});
+
     taskBloc = TaskBloc(
       repository: mockRepo,
       notificationService: mockNotifications,
-      settingsCubit: settingsCubit,
+      settingsCubit: mockSettingsCubit,
     );
 
     // Default stub for notification methods
@@ -59,6 +69,12 @@ void main() {
     ).thenAnswer((_) async {});
     when(
       () => mockNotifications.cancelTaskReminder(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockNotifications.showImmediate(
+        title: any(named: 'title'),
+        body: any(named: 'body'),
+      ),
     ).thenAnswer((_) async {});
   });
 
@@ -80,7 +96,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       act: (bloc) => bloc.add(LoadTasks()),
@@ -97,7 +113,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       act: (bloc) => bloc.add(LoadTasks()),
@@ -117,7 +133,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -142,7 +158,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -167,7 +183,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       seed: () => TaskLoaded(
@@ -191,7 +207,7 @@ void main() {
         return TaskBloc(
           repository: mockRepo,
           notificationService: mockNotifications,
-          settingsCubit: settingsCubit,
+          settingsCubit: mockSettingsCubit,
         );
       },
       seed: () => TaskLoaded(
