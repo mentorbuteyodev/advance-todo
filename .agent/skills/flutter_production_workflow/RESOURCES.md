@@ -2,31 +2,67 @@
 
 Use these templates to maintain high-fidelity standards across all project phases.
 
-## 1. Task Checklist Template (`task.md`)
+## 1. Modular Task Checklist (`task.md`)
 
 ```markdown
-# Project Name
+# [Project Name]
 
-## Milestone 1: Foundation
+## Phase 0: Architecture & Core
 
-- [ ] Initialize Clean Architecture Folders <!-- id: 1.1 -->
-- [ ] Configure Dependency Injection (GetIt) <!-- id: 1.2 -->
-- [ ] Set up GoRouter with Auth Guard <!-- id: 1.3 -->
+- [ ] Implement Core Module abstractions (Theming, DI, Storage) <!-- id: 0.1 -->
+- [ ] Design Auth-Data bridge & Sync Protocol <!-- id: 0.2 -->
 
-## Milestone 2: Feature Development
+## Phase 1: Feature: [Feature Name]
 
-- [ ] Domain: Define Entities & Repositories <!-- id: 2.1 -->
-- [ ] Data: Implement Models & DataSources <!-- id: 2.2 -->
-- [ ] Presentation: Build UI & Blocs <!-- id: 2.3 -->
+### Domain Layer
 
-## Milestone 3: Production Readiness
+- [ ] Define Entity with immutability and copyWith <!-- id: 1.1 -->
+- [ ] Create Repository interface & Failure objects <!-- id: 1.2 -->
+- [ ] Design functional Use Cases <!-- id: 1.3 -->
 
-- [ ] Implement global error handling (ZonedGuarded) <!-- id: 3.1 -->
-- [ ] Set up CI/CD pipeline (GitHub Actions) <!-- id: 3.2 -->
-- [ ] Verify unit and integration tests <!-- id: 3.3 -->
+### Data Layer
+
+- [ ] Implement DTO with Mappers <!-- id: 1.4 -->
+- [ ] Build Local & Remote DataSources <!-- id: 1.5 -->
+- [ ] Realize RepositoryImpl with sync logic <!-- id: 1.6 -->
+
+### Presentation Layer
+
+- [ ] Develop Atomic Widgets & Design System alignment <!-- id: 1.7 -->
+- [ ] Build BLoC/Cubit with state transitions <!-- id: 1.8 -->
+- [ ] Implement Shell & Hero transitions <!-- id: 1.9 -->
+
+## Phase 2: Production Hardening
+
+- [ ] Coverage: Unit & Widget test suite <!-- id: 2.1 -->
+- [ ] Verification: CI/CD integration and build checks <!-- id: 2.2 -->
 ```
 
-## 2. Implementation Plan Template (`implementation_plan.md`)
+## 2. Architecture Decision Record (ADR)
+
+Use this template to document significant architectural pivots.
+
+```markdown
+# ADR [ID]: [Short Title]
+
+## Status
+
+[Proposed | Accepted | Superseded]
+
+## Context
+
+[What is the problem we are solving? What are the constraints?]
+
+## Decision
+
+[What is the chosen approach? Why was it selected?]
+
+## Consequences
+
+[What is the impact on the codebase? Any trade-offs?]
+```
+
+## 3. Implementation Plan Template (`implementation_plan.md`)
 
 ```markdown
 # [Feature Name] Implementation

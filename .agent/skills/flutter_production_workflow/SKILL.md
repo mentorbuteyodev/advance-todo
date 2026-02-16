@@ -1,85 +1,103 @@
 ---
-name: Flutter Production Workflow
-description: A high-fidelity, multi-phase workflow for building production-ready Flutter applications with Clean Architecture, Offline-First Sync, and Premium UX.
+name: Flutter Production Workflow (Enterprise Grade)
+description: A high-fidelity, industrial-strength workflow for building production-ready Flutter applications with Modular Clean Architecture, Offline-First Delta-Sync, and Multi-Agent Orchestration.
 ---
 
-# Flutter Production Workflow
+# Flutter Production Workflow (Enterprise)
 
-This skill encapsulates the standards and repeatable processes for creating "World-Class" Flutter applications. It is designed to be used by an AI agent in a multi-phase lifecycle: **Planning → Execution → Verification**.
+This skill defines the "Gold Standard" for mission-critical Flutter applications. It is designed for multi-agent systems to execute complex, high-reliability development cycles.
 
-## 1. Architectural Standards (Clean Architecture)
+## 1. Modular Clean Architecture (MCA)
 
-Always structure the project using **Feature-First Clean Architecture**.
+Traditional Clean Architecture is not enough for large projects. We enforce **Modular Clean Architecture**.
 
-### Layer Definitions:
+### Structural Breakdown:
 
-- **Domain Layer**: The heart of the app. Pure Dart. Contains Entities (plain objects), Repositories (interfaces), and Use Cases.
-- **Data Layer**: Implementation detail. Contains Models (serialized entities), Data Sources (Remote/Local), and Repository implementations.
-- **Presentation Layer**: UI and Logic. Contains Pages, Widgets, and Blocs/Cubits.
+- **Core Module**: Cross-cutting concerns (Theming, Networking, DI, Storage).
+- **Feature Modules**: Independent vertical slices (e.g., `feature_auth`, `feature_tasks`).
+- **Domain (Feature Level)**:
+  - `Entities`: Thread-safe, immutable data objects.
+  - `Use Cases`: Single-responsibility business logic units.
+  - `Failures`: Standardized error objects for the domain.
+- **Data (Feature Level)**:
+  - `DTOs / Models`: Serialization layers with `fromJson/toJson`.
+  - `RepositoriesImpl`: The bridge between remote/local sources.
+  - `Mappers`: Pure functions converting DTOs to Entities.
+- **Presentation (Feature Level)**:
+  - `Atomic Widgets`: Small, reusable UI components.
+  - `Feature Shell`: The entry point for the feature.
+  - `Blocs/Cubits`: Reactive state management with custom `Transition` tracking.
 
-### Key Rules:
+### The "Dependency Rule":
 
-- The **Domain** layer must never import from **Data** or **Presentation**.
-- Use **GetIt** for Dependency Injection to decouple implementations from usage.
-- Use **BLoC/Cubit** for all state management; never use `setState` for business logic.
-
----
-
-## 2. High-Fidelity UI/UX Patterns
-
-A production app must _feel_ premium. Use these specific UI techniques:
-
-### Visual Aesthetics:
-
-- **Glassmorphism**: Use `white.withAlpha(x)` with subtle gradients and `PhysicalModel` for shadows.
-- **Hero Animations**: Use them for all navigational transitions (e.g., Avatar to Profile).
-- **Staggered Animations**: Use `flutter_staggered_animations` for list loads.
-- **Pinned Headers**: Use `ValueListenableBuilder` tied to a `ScrollController` to animate header height and opacity on scroll.
-
-### Micro-interactions:
-
-- Animated search-bar swaps using `AnimatedSwitcher`.
-- Scaled list items on tap to provide tactile feedback.
-- Custom empty states with themed icons and messaging.
+Inner layers (Domain) **NEVER** know about outer layers (Data/Presentation). All external dependencies are injected via interfaces.
 
 ---
 
-## 3. Reliable Offline-First Sync
+## 2. Multi-Agent Orchestration Protocol (MAOP)
 
-Do not rely on simple Firestore listeners. Implement a robust bidirectional bridge:
+When working as a team or across multiple tool-turns, agents must follow this strict state machine:
 
-### Sync Strategy:
+### Phase A: The Architect (Planning)
 
-- **Local Source**: Use **Hive** (or similar) as the primary source of truth.
-- **Pending Flags**: Tasks created offline must have `pendingSync: true`.
-- **Soft Deletes**: Never delete data locally; use `isDeleted: true` to ensure the deletion propagates to the cloud.
-- **Last-Write-Wins**: Use `updatedAt` timestamps on both local and remote nodes to resolve conflicts automatically.
-- **Auth Bridging**: Automatically trigger a `syncNow()` on login and clear local Hive data on logout.
+1.  **Codebase Audit**: Scan existing abstractions to avoid duplication.
+2.  **Schema Definition**: Define JSON/Database schemas before writing code.
+3.  **Implementation Plan**: Mandatory `implementation_plan.md` with file-level diff predictions.
+4.  **UI Mockup**: Use `generate_image` for new screens to align aesthetics.
 
----
+### Phase B: The Builder (Execution)
 
-## 4. Production Hardening
+1.  **Contract First**: Implement Domain interfaces first.
+2.  **Surgical Edits**: Use `multi_replace_file_content` to keep files clean.
+3.  **Local First**: Build local persistence before remote APIs.
+4.  **Lint-as-you-go**: Run `flutter analyze` after every major file change.
 
-An app is not "production-ready" until it is stable and measurable.
+### Phase C: The QA / Hardening (Verification)
 
-### Error Handling:
-
-- Wrap your app in `runZonedGuarded` in `main.dart`.
-- Set up `FlutterError.onError` to catch framework-level crashes.
-- Always include `try-catch` blocks around external services (Firebase, Hive, Notifications) to prevent boot-loops.
-
-### CI/CD & Testing:
-
-- Maintain a GitHub Action that runs `flutter analyze` and `flutter test` on every push.
-- **Unit Testing**: Mock dependencies (Repositories, Cubits) using `mocktail` or `mockito`.
-- **Integration Testing**: Implement at least one "Happy Path" E2E test using `integration_test`.
+1.  **Unit Tests**: Minimum 80% coverage for BLoCs and Use Cases.
+2.  **Widget Tests**: Verify state-to-UI mapping.
+3.  **Integration Tests**: Run the "Gold Path" E2E.
+4.  **Proof of Work**: Cumulative `walkthrough.md` with recordings/logs.
 
 ---
 
-## 5. The Multi-Agent Workflow
+## 3. High-Fidelity UX & Design Systems
 
-Follow this cycle for every significant change:
+Production apps must be "Market-Ready" from day one.
 
-1.  **Planning**: Research the codebase, update `task.md`, and create an `implementation_plan.md`. Get user approval.
-2.  **Execution**: Implement changes layer-by-layer (Domain → Data → Presentation). Run `flutter analyze` frequently.
-3.  **Verification**: Conduct manual testing (terminal logs) and automated testing. Create a `walkthrough.md` with proof of work.
+### UX Requirements:
+
+- **Design Tokens**: Centralized HSL colors, Spacing (4px grid), and Typography in `AppTheme`.
+- **Motion Spec**:
+  - `Micro-animations`: Scale-on-tap, Fade-on-load.
+  - `Structural Motion`: Hero transitions for navigation, Staggered lists.
+  - `Scroll-Dynamics`: Pinned/Shrinking headers via `NestedScrollView` or `CustomScrollView`.
+- **Accessibility**: Semantic labels for all interactive elements.
+
+---
+
+## 4. Advanced Offline-First Sync (Delta-Sync)
+
+A production sync engine must handle low-bandwidth and high-conflict scenarios.
+
+### Logic Flow:
+
+1.  **Optimistic UI**: Update local DB (Hive) and UI immediately.
+2.  **The Outbox Pattern**: Store pending operations in a persistent local queue.
+3.  **Delta Syncing**: Only upload modified fields, not the whole object.
+4.  **Conflict Strategy**:
+    - Meta-data: `updatedAt` (Server-side & Client-side).
+    - Logic: "Last Write Wins" or "Merge" (based on specific field type).
+5.  **Soft-Delete Protocol**: Mark `deleted_at`, sync to cloud, then hard-delete locally only after cloud confirmation.
+
+---
+
+## 5. Security & Stability Core
+
+- **Secure Storage**: Use `flutter_secure_storage` for tokens and sensitive keys.
+- **Environment Management**: Separation of `Dev`, `Staging`, and `Prod` flavors.
+- **Global Guardians**:
+  - `runZonedGuarded` for unhandled exceptions.
+  - `FlutterError.onError` for rendering crashes.
+  - `PlatformDispatcher` for native-level crashes.
+- **CI Enforcement**: Reject any push that fails `lint` or `test` cycles.
