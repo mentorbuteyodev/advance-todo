@@ -77,79 +77,64 @@ class TaskRepositoryImpl implements TaskRepository {
     final uid = _currentUid;
     if (uid == null || _isSyncing) return;
     _isSyncing = true;
-    debugPrint('🔄 Starting full sync for $uid...');
+    debugPrint('🔄 Starting comprehensive sync for $uid...');
 
     try {
-      // 1. Push pending local changes to remote
-      final pendingTasks = await localDataSource.getPendingSyncTasks();
-      for (final task in pendingTasks) {
-        try {
-          if (task.isDeleted) {
-            // Soft-deleted locally → delete from remote and purge
-            await remoteDataSource.deleteTask(uid, task.id);
-            await localDataSource.purgeTask(task.id);
-            debugPrint('🗑️ Synced deletion: ${task.id}');
-          } else {
-            // Push upsert to remote
-            final syncedTask = TaskModel(
-              id: task.id,
-              title: task.title,
-              description: task.description,
-              statusIndex: task.statusIndex,
-              priorityIndex: task.priorityIndex,
-              createdAt: task.createdAt,
-              updatedAt: task.updatedAt,
-              dueDate: task.dueDate,
-              tags: task.tags,
-              parentId: task.parentId,
-              isRecurring: task.isRecurring,
-              recurringPattern: task.recurringPattern,
-              sortOrder: task.sortOrder,
-              isDeleted: false,
-              pendingSync: false,
-            );
-            await remoteDataSource.saveTask(uid, syncedTask);
-            // Clear pending flag locally
-            await localDataSource.updateTask(syncedTask);
-            debugPrint('⬆️ Pushed: ${task.id}');
-          }
-        } catch (e) {
-          debugPrint('⚠️ Failed to sync ${task.id}: $e');
-          // Leave pendingSync = true so it retries next time
-        }
-      }
-
-      // 2. Pull remote tasks and merge into local
+      // 1. Fetch remote and local snapshots
       final remoteTasks = await remoteDataSource.getTasks(uid);
       final localTasks = await localDataSource.getAllTasksRaw();
+
+      final remoteMap = {for (final t in remoteTasks) t.id: t};
       final localMap = {for (final t in localTasks) t.id: t};
 
-      for (final remoteTask in remoteTasks) {
-        final localTask = localMap[remoteTask.id];
-        if (localTask == null) {
-          // New from remote
-          await localDataSource.addTask(remoteTask);
-        } else if (!localTask.pendingSync &&
-            remoteTask.updatedAt.isAfter(localTask.updatedAt)) {
-          // Remote is newer, local has no pending changes
-          await localDataSource.updateTask(remoteTask);
+      Set<String> allIds = {...remoteMap.keys, ...localMap.keys};
+
+      for (final id in allIds) {
+        final remote = remoteMap[id];
+        final local = localMap[id];
+
+        if (local == null && remote != null) {
+          // A) Exists on remote but not locally -> Download
+          debugPrint('⬇️ Downloading new task: $id');
+          await localDataSource.addTask(remote);
+        } else if (local != null && remote == null) {
+          // B) Exists locally but not on remote
+          if (local.isDeleted) {
+            // It was soft-deleted locally while offline, and doesn't exist on remote? Just purge locally.
+            debugPrint('🧹 Purging local soft-deleted orphan: $id');
+            await localDataSource.purgeTask(id);
+          } else {
+            // INITIAL MIGRATION CASE: Local task exists but is not in cloud yet. Upload it!
+            debugPrint('⬆️ Migrating local task to cloud: $id');
+            final toSync = local.copyWith(pendingSync: false);
+            await remoteDataSource.saveTask(uid, toSync);
+            await localDataSource.updateTask(toSync);
+          }
+        } else if (local != null && remote != null) {
+          // C) Exists in both -> Conflict Resolution (Last Write Wins)
+          if (local.isDeleted) {
+            // Local is soft-deleted. Propagate deletion to remote.
+            debugPrint('🗑️ Syncing deletion to remote: $id');
+            await remoteDataSource.deleteTask(uid, id);
+            await localDataSource.purgeTask(id);
+          } else if (local.pendingSync ||
+              local.updatedAt.isAfter(remote.updatedAt)) {
+            // Local is newer or has pending changes -> PUSH
+            debugPrint('⬆️ Pushing local updates (newer): $id');
+            final toSync = local.copyWith(pendingSync: false);
+            await remoteDataSource.saveTask(uid, toSync);
+            await localDataSource.updateTask(toSync);
+          } else if (remote.updatedAt.isAfter(local.updatedAt)) {
+            // Remote is newer -> PULL
+            debugPrint('⬇️ Pulling remote updates (newer): $id');
+            await localDataSource.updateTask(remote);
+          }
         }
-        localMap.remove(remoteTask.id);
       }
 
-      // 3. Remaining in localMap are tasks not on remote
-      //    — they were either created offline (pendingSync) or deleted remotely
-      for (final orphan in localMap.values) {
-        if (!orphan.pendingSync && !orphan.isDeleted) {
-          // Not pending and not in remote → was deleted remotely
-          await localDataSource.purgeTask(orphan.id);
-          debugPrint('🧹 Purged locally (deleted remotely): ${orphan.id}');
-        }
-      }
-
-      debugPrint('✅ Sync complete');
+      debugPrint('✅ Cloud synchronization complete');
     } catch (e) {
-      debugPrint('❌ Sync error: $e');
+      debugPrint('❌ Cloud synchronization error: $e');
     } finally {
       _isSyncing = false;
     }

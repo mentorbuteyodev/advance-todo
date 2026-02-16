@@ -92,6 +92,42 @@ class TaskModel extends HiveObject {
     );
   }
 
+  TaskModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    int? statusIndex,
+    int? priorityIndex,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? dueDate,
+    List<String>? tags,
+    String? parentId,
+    bool? isRecurring,
+    String? recurringPattern,
+    int? sortOrder,
+    bool? isDeleted,
+    bool? pendingSync,
+  }) {
+    return TaskModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      statusIndex: statusIndex ?? this.statusIndex,
+      priorityIndex: priorityIndex ?? this.priorityIndex,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      dueDate: dueDate ?? this.dueDate,
+      tags: tags ?? this.tags,
+      parentId: parentId ?? this.parentId,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringPattern: recurringPattern ?? this.recurringPattern,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isDeleted: isDeleted ?? this.isDeleted,
+      pendingSync: pendingSync ?? this.pendingSync,
+    );
+  }
+
   /// Convert from Data Model to Domain Entity.
   TaskEntity toEntity({List<TaskEntity> subtasks = const []}) {
     return TaskEntity(
