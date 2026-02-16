@@ -10,8 +10,43 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<double> _headerOffset = ValueNotifier<double>(0.0);
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _headerOffset.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.offset;
+    // Cap the offset at 120 which is the height we'll collapse
+    if (offset < 0) {
+      if (_headerOffset.value != 0) _headerOffset.value = 0;
+    } else if (offset <= 120) {
+      _headerOffset.value = offset;
+    } else if (_headerOffset.value != 120) {
+      _headerOffset.value = 120;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,75 +75,117 @@ class ProfilePage extends StatelessWidget {
                 bottom: false,
                 child: Column(
                   children: [
-                    // ── Fixed Header (Nav + User Info) ──
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                      child: Column(
-                        children: [
-                          // Nav Bar
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () => context.pop(),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Profile',
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
+                    // ── Animated Header (Nav + User Info) ──
+                    ValueListenableBuilder<double>(
+                      valueListenable: _headerOffset,
+                      builder: (context, offset, _) {
+                        final double opacity = (1.0 - (offset / 100)).clamp(
+                          0.0,
+                          1.0,
+                        );
+                        final double userInfoHeight = (180 - offset).clamp(
+                          0.0,
+                          180.0,
+                        );
 
-                          // User Info
-                          Hero(
-                            tag: 'profile_btn',
-                            child: Material(
-                              type: MaterialType.transparency,
-                              child: CircleAvatar(
-                                radius: 44,
-                                backgroundColor: Colors.white.withAlpha(50),
-                                child: CircleAvatar(
-                                  radius: 40,
-                                  backgroundColor: Colors.white,
-                                  child: Text(
-                                    user.displayName?.isNotEmpty == true
-                                        ? user.displayName![0].toUpperCase()
-                                        : user.email[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primaryColor,
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Column(
+                            children: [
+                              // Nav Bar (Always visible)
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () => context.pop(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Profile',
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                ],
+                              ),
+
+                              // Shrinking User Info section
+                              SizedBox(
+                                height: userInfoHeight,
+                                child: Opacity(
+                                  opacity: opacity,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    child: Column(
+                                      children: [
+                                        const SizedBox(height: 12),
+                                        // User Avatar
+                                        Hero(
+                                          tag: 'profile_btn',
+                                          child: Material(
+                                            type: MaterialType.transparency,
+                                            child: CircleAvatar(
+                                              radius: 44,
+                                              backgroundColor: Colors.white
+                                                  .withAlpha(50),
+                                              child: CircleAvatar(
+                                                radius: 40,
+                                                backgroundColor: Colors.white,
+                                                child: Text(
+                                                  user
+                                                              .displayName
+                                                              ?.isNotEmpty ==
+                                                          true
+                                                      ? user.displayName![0]
+                                                            .toUpperCase()
+                                                      : user.email[0]
+                                                            .toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 32,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        AppTheme.primaryColor,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          user.displayName ?? 'User',
+                                          style: theme.textTheme.headlineSmall
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          user.email,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color: Colors.white.withAlpha(
+                                                  200,
+                                                ),
+                                              ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            user.displayName ?? 'User',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user.email,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withAlpha(200),
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
 
                     // ── Floating Sheet (Settings) ──
@@ -123,6 +200,7 @@ class ProfilePage extends StatelessWidget {
                         ),
                         clipBehavior: Clip.hardEdge,
                         child: ListView(
+                          controller: _scrollController,
                           padding: const EdgeInsets.all(24),
                           physics: const BouncingScrollPhysics(),
                           children: [
