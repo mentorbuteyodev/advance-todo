@@ -38,13 +38,13 @@ class _ProfilePageState extends State<ProfilePage> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final offset = _scrollController.offset;
-    // Cap the offset at 120 which is the height we'll collapse
+    // Cap at 180 to allow full collapse of user info
     if (offset < 0) {
       if (_headerOffset.value != 0) _headerOffset.value = 0;
-    } else if (offset <= 120) {
+    } else if (offset <= 180) {
       _headerOffset.value = offset;
-    } else if (_headerOffset.value != 120) {
-      _headerOffset.value = 120;
+    } else if (_headerOffset.value != 180) {
+      _headerOffset.value = 180;
     }
   }
 
@@ -79,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ValueListenableBuilder<double>(
                       valueListenable: _headerOffset,
                       builder: (context, offset, _) {
-                        final double opacity = (1.0 - (offset / 100)).clamp(
+                        final double opacity = (1.0 - (offset / 120)).clamp(
                           0.0,
                           1.0,
                         );
@@ -89,29 +89,32 @@ class _ProfilePageState extends State<ProfilePage> {
                         );
 
                         return Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
                               // Nav Bar (Always visible)
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.arrow_back_ios_new_rounded,
-                                      color: Colors.white,
+                              SizedBox(
+                                height: 56,
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.arrow_back_ios_new_rounded,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () => context.pop(),
                                     ),
-                                    onPressed: () => context.pop(),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Profile',
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Profile',
+                                      style: theme.textTheme.headlineMedium
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ],
+                                ),
                               ),
 
                               // Shrinking User Info section
