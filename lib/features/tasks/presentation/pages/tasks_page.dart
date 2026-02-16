@@ -11,6 +11,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../bloc/task_bloc.dart';
 import '../bloc/task_event.dart';
 import '../bloc/task_state.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../widgets/add_task_sheet.dart';
 import '../widgets/task_item.dart';
 
@@ -102,338 +104,358 @@ class _TasksBodyState extends State<_TasksBody> {
     final double headerHeightReduction = _headerOffset.clamp(0.0, 80.0);
 
     // Main Gradient Container acting as the substantial background
-    return Container(
-      decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-      child: SafeArea(
-        bottom: false, // Let the sheet go to the bottom
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Fixed Header ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Row (Animated Title/Search Swap + Profile)
-                  SizedBox(
-                    height: 56,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            transitionBuilder: (child, animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0.2, 0),
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: _isSearching
-                                ? PhysicalModel(
-                                    key: const ValueKey('search_field'),
-                                    color: Colors.white,
-                                    elevation: 4,
-                                    shadowColor: Colors.black.withAlpha(50),
-                                    borderRadius: BorderRadius.circular(30),
-                                    child: TextField(
-                                      controller: _searchController,
-                                      autofocus: true,
-                                      style: GoogleFonts.inter(
-                                        color: const Color(0xFF2D3436),
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is Authenticated) {
+          // Trigger a fresh load (which includes sync) when user logs in
+          context.read<TaskBloc>().add(LoadTasks());
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
+        child: SafeArea(
+          bottom: false, // Let the sheet go to the bottom
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Fixed Header ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row (Animated Title/Search Swap + Profile)
+                    SizedBox(
+                      height: 56,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0.2, 0),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: _isSearching
+                                  ? PhysicalModel(
+                                      key: const ValueKey('search_field'),
+                                      color: Colors.white,
+                                      elevation: 4,
+                                      shadowColor: Colors.black.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(30),
+                                      child: TextField(
+                                        controller: _searchController,
+                                        autofocus: true,
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF2D3436),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        cursorColor: theme.primaryColor,
+                                        decoration: InputDecoration(
+                                          fillColor: Colors.white,
+                                          filled: true,
+                                          hintText: 'Search tasks...',
+                                          hintStyle: GoogleFonts.inter(
+                                            color: const Color(0xFFB2BEC3),
+                                            fontSize: 15,
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.search_rounded,
+                                            color: theme.primaryColor,
+                                            size: 22,
+                                          ),
+                                          suffixIcon: IconButton(
+                                            icon: const Icon(
+                                              Icons.close_rounded,
+                                              color: Color(0xFF636E72),
+                                              size: 20,
+                                            ),
+                                            onPressed: _toggleSearch,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                            borderSide: BorderSide.none,
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                            borderSide: const BorderSide(
+                                              color: Color(0xFFDFE6E9),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 14,
+                                              ),
+                                        ),
+                                        onChanged: (value) {
+                                          context.read<TaskBloc>().add(
+                                            SearchQueryChanged(value),
+                                          );
+                                        },
                                       ),
-                                      cursorColor: theme.primaryColor,
-                                      decoration: InputDecoration(
-                                        fillColor: Colors.white,
-                                        filled: true,
-                                        hintText: 'Search tasks...',
-                                        hintStyle: GoogleFonts.inter(
-                                          color: const Color(0xFFB2BEC3),
-                                          fontSize: 15,
-                                        ),
-                                        prefixIcon: Icon(
-                                          Icons.search_rounded,
-                                          color: theme.primaryColor,
-                                          size: 22,
-                                        ),
-                                        suffixIcon: IconButton(
-                                          icon: const Icon(
-                                            Icons.close_rounded,
-                                            color: Color(0xFF636E72),
-                                            size: 20,
-                                          ),
-                                          onPressed: _toggleSearch,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            30,
-                                          ),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            30,
-                                          ),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            30,
-                                          ),
-                                          borderSide: const BorderSide(
-                                            color: Color(0xFFDFE6E9),
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              vertical: 14,
+                                    )
+                                  : Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'TaskFlow',
+                                        key: const ValueKey('app_title'),
+                                        style: theme.textTheme.headlineLarge
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: -1,
                                             ),
                                       ),
-                                      onChanged: (value) {
-                                        context.read<TaskBloc>().add(
-                                          SearchQueryChanged(value),
-                                        );
-                                      },
-                                    ),
-                                  )
-                                : Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'TaskFlow',
-                                      key: const ValueKey('app_title'),
-                                      style: theme.textTheme.headlineLarge
-                                          ?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: -1,
-                                          ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-
-                        // Right Side Icons
-                        Row(
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: !_isSearching
-                                  ? Row(
-                                      key: const ValueKey('header_actions'),
-                                      children: [
-                                        IconButton(
-                                          onPressed: _toggleSearch,
-                                          icon: const Icon(
-                                            Icons.search_rounded,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                      ],
-                                    )
-                                  : const SizedBox(
-                                      key: ValueKey('header_spacer'),
-                                      width: 8,
                                     ),
                             ),
-                            Hero(
-                              tag: 'profile_btn',
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () => context.push('/profile'),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(30),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.person_rounded,
-                                      color: Colors.white,
-                                      size: 20,
+                          ),
+
+                          // Right Side Icons
+                          Row(
+                            children: [
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: !_isSearching
+                                    ? Row(
+                                        key: const ValueKey('header_actions'),
+                                        children: [
+                                          IconButton(
+                                            onPressed: _toggleSearch,
+                                            icon: const Icon(
+                                              Icons.search_rounded,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                      )
+                                    : const SizedBox(
+                                        key: ValueKey('header_spacer'),
+                                        width: 8,
+                                      ),
+                              ),
+                              Hero(
+                                tag: 'profile_btn',
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => context.push('/profile'),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withAlpha(30),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Progress Card (Animated Height Collapse)
+                    BlocBuilder<TaskBloc, TaskState>(
+                      builder: (context, state) {
+                        // Determine target height: 0 if searching, else based on scroll
+                        // Check for loading state to avoid jank
+                        final shouldShow = state is TaskLoaded && !_isSearching;
+                        final double targetHeight = shouldShow
+                            ? (90 - headerHeightReduction).clamp(0.0, 90.0)
+                            : 0.0;
+
+                        // Also animate margin to 0 when collapsed
+                        final double targetMargin = shouldShow
+                            ? (24 - (headerHeightReduction / 3)).clamp(
+                                0.0,
+                                24.0,
+                              )
+                            : 0.0;
+
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOutCubic,
+                          height: targetHeight,
+                          margin: EdgeInsets.only(
+                            top: shouldShow ? targetMargin : 0,
+                            bottom: shouldShow ? targetMargin : 16,
+                          ),
+                          child: SingleChildScrollView(
+                            physics: const NeverScrollableScrollPhysics(),
+                            child: state is TaskLoaded
+                                ? Opacity(
+                                    // Opacity is also driven by scroll, but force 0 if searching
+                                    opacity: _isSearching
+                                        ? 0.0
+                                        : progressOpacity,
+                                    child: _ProgressCard(
+                                      completedCount: state.completedCount,
+                                      totalCount: state.totalCount,
+                                      completionRate: state.completionRate,
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Floating Sheet ──
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(30),
                     ),
                   ),
-
-                  // Progress Card (Animated Height Collapse)
-                  BlocBuilder<TaskBloc, TaskState>(
+                  clipBehavior: Clip.hardEdge,
+                  child: BlocBuilder<TaskBloc, TaskState>(
                     builder: (context, state) {
-                      // Determine target height: 0 if searching, else based on scroll
-                      // Check for loading state to avoid jank
-                      final shouldShow = state is TaskLoaded && !_isSearching;
-                      final double targetHeight = shouldShow
-                          ? (90 - headerHeightReduction).clamp(0.0, 90.0)
-                          : 0.0;
+                      return CustomScrollView(
+                        controller: _scrollController,
+                        physics: const BouncingScrollPhysics(),
+                        slivers: [
+                          // Filter Tabs (Pinned to top of sheet?)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                24,
+                                16,
+                                16,
+                              ),
+                              child: _FilterTabs(
+                                activeFilter: state is TaskLoaded
+                                    ? state.activeFilter
+                                    : TaskFilter.all,
+                              ),
+                            ),
+                          ),
 
-                      // Also animate margin to 0 when collapsed
-                      final double targetMargin = shouldShow
-                          ? (24 - (headerHeightReduction / 3)).clamp(0.0, 24.0)
-                          : 0.0;
-
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOutCubic,
-                        height: targetHeight,
-                        margin: EdgeInsets.only(
-                          top: shouldShow ? targetMargin : 0,
-                          bottom: shouldShow ? targetMargin : 16,
-                        ),
-                        child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: state is TaskLoaded
-                              ? Opacity(
-                                  // Opacity is also driven by scroll, but force 0 if searching
-                                  opacity: _isSearching ? 0.0 : progressOpacity,
-                                  child: _ProgressCard(
-                                    completedCount: state.completedCount,
-                                    totalCount: state.totalCount,
-                                    completionRate: state.completionRate,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
+                          // List Content
+                          if (state is TaskLoading)
+                            const SliverFillRemaining(
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (state is TaskLoaded &&
+                              state.filteredTasks.isEmpty)
+                            SliverFillRemaining(
+                              child: _EmptyState(filter: state.activeFilter),
+                            )
+                          else if (state is TaskLoaded)
+                            SliverPadding(
+                              padding: const EdgeInsets.only(bottom: 100),
+                              // Key forces re-animation when filter changes
+                              sliver: AnimationLimiter(
+                                key: ValueKey(
+                                  '${state.activeFilter}_${state.filteredTasks.length}',
+                                ),
+                                child: SliverList(
+                                  delegate: SliverChildBuilderDelegate((
+                                    context,
+                                    index,
+                                  ) {
+                                    final task = state.filteredTasks[index];
+                                    return AnimationConfiguration.staggeredList(
+                                      position: index,
+                                      duration: const Duration(
+                                        milliseconds: 375,
+                                      ),
+                                      child: SlideAnimation(
+                                        verticalOffset: 50.0,
+                                        child: FadeInAnimation(
+                                          child: ScaleAnimation(
+                                            scale: 0.95,
+                                            child: TaskItem(
+                                              task: task,
+                                              onToggle: () => context
+                                                  .read<TaskBloc>()
+                                                  .add(ToggleTaskStatus(task)),
+                                              onDelete: () => context
+                                                  .read<TaskBloc>()
+                                                  .add(DeleteTask(task.id)),
+                                              onTap: () => context.push(
+                                                '/tasks/${task.id}',
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }, childCount: state.filteredTasks.length),
+                                ),
+                              ),
+                            )
+                          else if (state is TaskError)
+                            SliverFillRemaining(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 48,
+                                      color: AppTheme.errorColor,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Something went wrong',
+                                      style: theme.textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      state.message,
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),
-                ],
-              ),
-            ),
-
-            // ── Floating Sheet ──
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(30),
-                  ),
-                ),
-                clipBehavior: Clip.hardEdge,
-                child: BlocBuilder<TaskBloc, TaskState>(
-                  builder: (context, state) {
-                    return CustomScrollView(
-                      controller: _scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
-                        // Filter Tabs (Pinned to top of sheet?)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                            child: _FilterTabs(
-                              activeFilter: state is TaskLoaded
-                                  ? state.activeFilter
-                                  : TaskFilter.all,
-                            ),
-                          ),
-                        ),
-
-                        // List Content
-                        if (state is TaskLoading)
-                          const SliverFillRemaining(
-                            child: Center(child: CircularProgressIndicator()),
-                          )
-                        else if (state is TaskLoaded &&
-                            state.filteredTasks.isEmpty)
-                          SliverFillRemaining(
-                            child: _EmptyState(filter: state.activeFilter),
-                          )
-                        else if (state is TaskLoaded)
-                          SliverPadding(
-                            padding: const EdgeInsets.only(bottom: 100),
-                            // Key forces re-animation when filter changes
-                            sliver: AnimationLimiter(
-                              key: ValueKey(
-                                '${state.activeFilter}_${state.filteredTasks.length}',
-                              ),
-                              child: SliverList(
-                                delegate: SliverChildBuilderDelegate((
-                                  context,
-                                  index,
-                                ) {
-                                  final task = state.filteredTasks[index];
-                                  return AnimationConfiguration.staggeredList(
-                                    position: index,
-                                    duration: const Duration(milliseconds: 375),
-                                    child: SlideAnimation(
-                                      verticalOffset: 50.0,
-                                      child: FadeInAnimation(
-                                        child: ScaleAnimation(
-                                          scale: 0.95,
-                                          child: TaskItem(
-                                            task: task,
-                                            onToggle: () => context
-                                                .read<TaskBloc>()
-                                                .add(ToggleTaskStatus(task)),
-                                            onDelete: () => context
-                                                .read<TaskBloc>()
-                                                .add(DeleteTask(task.id)),
-                                            onTap: () => context.push(
-                                              '/tasks/${task.id}',
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }, childCount: state.filteredTasks.length),
-                              ),
-                            ),
-                          )
-                        else if (state is TaskError)
-                          SliverFillRemaining(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.error_outline_rounded,
-                                    size: 48,
-                                    color: AppTheme.errorColor,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Something went wrong',
-                                    style: theme.textTheme.titleLarge,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    state.message,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

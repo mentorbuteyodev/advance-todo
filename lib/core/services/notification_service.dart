@@ -130,7 +130,7 @@ class NotificationService {
           body: '"$title" is due in 30 minutes',
           scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
           notificationDetails: _notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
         debugPrint(
           '🔔 30-min reminder for "$title" scheduled at $reminderTime',
@@ -149,7 +149,7 @@ class NotificationService {
           body: '"$title" is due right now',
           scheduledDate: tz.TZDateTime.from(dueDate, tz.local),
           notificationDetails: _notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
         debugPrint(
           '🔔 Due-time notification for "$title" scheduled at $dueDate',

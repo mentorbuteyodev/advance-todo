@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/task_entity.dart';
 import '../../domain/repositories/task_repository.dart';
+import '../../../auth/domain/repositories/auth_repository.dart';
 import '../datasources/task_local_data_source.dart';
 import '../datasources/remote_task_data_source.dart';
 import '../models/task_model.dart';
@@ -10,19 +11,48 @@ import '../models/task_model.dart';
 class TaskRepositoryImpl implements TaskRepository {
   final TaskLocalDataSource localDataSource;
   final RemoteTaskDataSource remoteDataSource;
+  final AuthRepository authRepository;
   StreamSubscription? _remoteSubscription;
+  StreamSubscription? _authSubscription;
   bool _isSyncing = false;
 
   TaskRepositoryImpl({
     required this.localDataSource,
     required this.remoteDataSource,
+    required this.authRepository,
   }) {
-    _initRemoteListener();
+    _initAuthListener();
+  }
+
+  String? get _currentUid => authRepository.currentUser?.uid;
+
+  // ── Auth Listener ──────────────────────────────────────────
+  void _initAuthListener() {
+    _authSubscription?.cancel();
+    _authSubscription = authRepository.authStateChanges.listen((user) async {
+      if (user != null) {
+        debugPrint('🔔 User logged in: ${user.uid}. Starting sync...');
+        _initRemoteListener();
+        // Trigger a sync immediately on login
+        await syncNow();
+      } else {
+        debugPrint(
+          '🔕 User logged out. Stopping sync and clearing local data.',
+        );
+        _remoteSubscription?.cancel();
+        _remoteSubscription = null;
+        await clearLocalData();
+      }
+    });
   }
 
   // ── Remote → Local Listener ──────────────────────────────────
   void _initRemoteListener() {
-    _remoteSubscription = remoteDataSource.getTasksStream().listen((
+    final uid = _currentUid;
+    if (uid == null) return;
+
+    _remoteSubscription?.cancel();
+    _remoteSubscription = remoteDataSource.getTasksStream(uid).listen((
       remoteTasks,
     ) async {
       if (_isSyncing) return; // Skip during active sync to avoid loops
@@ -44,9 +74,10 @@ class TaskRepositoryImpl implements TaskRepository {
   // ── Full Bidirectional Sync ──────────────────────────────────
   @override
   Future<void> syncNow() async {
-    if (_isSyncing) return;
+    final uid = _currentUid;
+    if (uid == null || _isSyncing) return;
     _isSyncing = true;
-    debugPrint('🔄 Starting full sync...');
+    debugPrint('🔄 Starting full sync for $uid...');
 
     try {
       // 1. Push pending local changes to remote
@@ -55,7 +86,7 @@ class TaskRepositoryImpl implements TaskRepository {
         try {
           if (task.isDeleted) {
             // Soft-deleted locally → delete from remote and purge
-            await remoteDataSource.deleteTask(task.id);
+            await remoteDataSource.deleteTask(uid, task.id);
             await localDataSource.purgeTask(task.id);
             debugPrint('🗑️ Synced deletion: ${task.id}');
           } else {
@@ -77,7 +108,7 @@ class TaskRepositoryImpl implements TaskRepository {
               isDeleted: false,
               pendingSync: false,
             );
-            await remoteDataSource.saveTask(syncedTask);
+            await remoteDataSource.saveTask(uid, syncedTask);
             // Clear pending flag locally
             await localDataSource.updateTask(syncedTask);
             debugPrint('⬆️ Pushed: ${task.id}');
@@ -89,7 +120,7 @@ class TaskRepositoryImpl implements TaskRepository {
       }
 
       // 2. Pull remote tasks and merge into local
-      final remoteTasks = await remoteDataSource.getTasks();
+      final remoteTasks = await remoteDataSource.getTasks(uid);
       final localTasks = await localDataSource.getAllTasksRaw();
       final localMap = {for (final t in localTasks) t.id: t};
 
@@ -124,8 +155,15 @@ class TaskRepositoryImpl implements TaskRepository {
     }
   }
 
+  @override
+  Future<void> clearLocalData() async {
+    await localDataSource.clear();
+    debugPrint('🧹 Local data cleared');
+  }
+
   void dispose() {
     _remoteSubscription?.cancel();
+    _authSubscription?.cancel();
   }
 
   // ── CRUD Operations ──────────────────────────────────────────
@@ -145,34 +183,41 @@ class TaskRepositoryImpl implements TaskRepository {
 
   @override
   Future<void> addTask(TaskEntity task) async {
+    final uid = _currentUid;
     final model = TaskModel.fromEntity(task.copyWith(pendingSync: true));
     await localDataSource.addTask(model);
-    try {
-      await remoteDataSource.saveTask(model);
-      // Remote succeeded → clear pendingSync flag
-      final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
-      await localDataSource.updateTask(synced);
-    } catch (e) {
-      debugPrint('⚠️ Remote add failed (queued): $e');
-      // Stays pendingSync = true → will push on next syncNow()
+    if (uid != null) {
+      try {
+        await remoteDataSource.saveTask(uid, model);
+        // Remote succeeded → clear pendingSync flag
+        final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
+        await localDataSource.updateTask(synced);
+      } catch (e) {
+        debugPrint('⚠️ Remote add failed (queued): $e');
+        // Stays pendingSync = true → will push on next syncNow()
+      }
     }
   }
 
   @override
   Future<void> updateTask(TaskEntity task) async {
+    final uid = _currentUid;
     final model = TaskModel.fromEntity(task.copyWith(pendingSync: true));
     await localDataSource.updateTask(model);
-    try {
-      await remoteDataSource.saveTask(model);
-      final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
-      await localDataSource.updateTask(synced);
-    } catch (e) {
-      debugPrint('⚠️ Remote update failed (queued): $e');
+    if (uid != null) {
+      try {
+        await remoteDataSource.saveTask(uid, model);
+        final synced = TaskModel.fromEntity(task.copyWith(pendingSync: false));
+        await localDataSource.updateTask(synced);
+      } catch (e) {
+        debugPrint('⚠️ Remote update failed (queued): $e');
+      }
     }
   }
 
   @override
   Future<void> deleteTask(String id) async {
+    final uid = _currentUid;
     // Soft delete: mark as deleted + pendingSync
     final existing = await localDataSource.getTaskById(id);
     if (existing != null) {
@@ -203,13 +248,15 @@ class TaskRepositoryImpl implements TaskRepository {
     }
 
     // Try to delete remotely immediately
-    try {
-      await remoteDataSource.deleteTask(id);
-      // If remote delete succeeded, purge locally
-      await localDataSource.purgeTask(id);
-    } catch (e) {
-      debugPrint('⚠️ Remote delete failed (queued): $e');
-      // Will purge on next syncNow()
+    if (uid != null) {
+      try {
+        await remoteDataSource.deleteTask(uid, id);
+        // If remote delete succeeded, purge locally
+        await localDataSource.purgeTask(id);
+      } catch (e) {
+        debugPrint('⚠️ Remote delete failed (queued): $e');
+        // Will purge on next syncNow()
+      }
     }
   }
 

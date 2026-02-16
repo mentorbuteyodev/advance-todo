@@ -23,6 +23,9 @@ abstract class TaskLocalDataSource {
 
   /// Permanently remove a task from local storage (after remote delete confirmed).
   Future<void> purgeTask(String id);
+
+  /// Clear all local task data.
+  Future<void> clear();
 }
 
 class TaskLocalDataSourceImpl implements TaskLocalDataSource {
@@ -114,6 +117,12 @@ class TaskLocalDataSourceImpl implements TaskLocalDataSource {
   @override
   Future<void> purgeTask(String id) async {
     await _taskBox.delete(id);
+    _emitTasks();
+  }
+
+  @override
+  Future<void> clear() async {
+    await _taskBox.clear();
     _emitTasks();
   }
 

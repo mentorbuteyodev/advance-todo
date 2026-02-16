@@ -37,4 +37,7 @@ abstract class TaskRepository {
 
   /// Trigger a full bidirectional sync with remote.
   Future<void> syncNow();
+
+  /// Clear all local task data (e.g., on logout).
+  Future<void> clearLocalData();
 }

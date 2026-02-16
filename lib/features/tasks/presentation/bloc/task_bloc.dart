@@ -2,6 +2,7 @@
 // Manages all task-related state transitions.
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
@@ -72,9 +73,31 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
   }
 
   Future<void> _onAddTask(AddTask event, Emitter<TaskState> emit) async {
+    final taskId = _uuid.v4();
     try {
+      // GATED: Only show/schedule notifications for top-level tasks (no parentId)
+      if (event.parentId == null && _notificationsEnabled) {
+        // 1) Show immediate notification BEFORE any potentially slow repo calls
+        notificationService
+            .showImmediate(
+              title: '✅ Task Created',
+              body: '"${event.title}" has been added to your tasks',
+            )
+            .catchError((e) => debugPrint('⚠️ Notification error: $e'));
+
+        // 2) Schedule timed reminders if due date is set
+        if (event.dueDate != null) {
+          notificationService
+              .scheduleTaskReminder(
+                taskId: taskId,
+                title: event.title,
+                dueDate: event.dueDate!,
+              )
+              .catchError((e) => debugPrint('⚠️ Reminder error: $e'));
+        }
+      }
+
       final now = DateTime.now();
-      final taskId = _uuid.v4();
       final task = TaskEntity(
         id: taskId,
         title: event.title,
@@ -90,21 +113,6 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
         recurringPattern: event.recurringPattern,
       );
       await repository.addTask(task);
-
-      // Schedule notification if due date is set and notifications are enabled
-      if (event.dueDate != null && _notificationsEnabled) {
-        await notificationService.scheduleTaskReminder(
-          taskId: taskId,
-          title: event.title,
-          dueDate: event.dueDate!,
-        );
-        // Show confirmation notification
-        await notificationService.showImmediate(
-          title: '✅ Reminder Set',
-          body:
-              'You\'ll be reminded about "${event.title}" 30 min before it\'s due',
-        );
-      }
     } catch (e) {
       emit(TaskError(e.toString()));
     }
@@ -116,15 +124,17 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
         event.task.copyWith(updatedAt: DateTime.now()),
       );
 
-      // Reschedule notification if due date changed and notifications are enabled
-      if (event.task.dueDate != null && _notificationsEnabled) {
-        await notificationService.scheduleTaskReminder(
-          taskId: event.task.id,
-          title: event.task.title,
-          dueDate: event.task.dueDate!,
-        );
-      } else {
-        await notificationService.cancelTaskReminder(event.task.id);
+      // GATED: Only for top-level tasks
+      if (event.task.parentId == null && _notificationsEnabled) {
+        if (event.task.dueDate != null) {
+          await notificationService.scheduleTaskReminder(
+            taskId: event.task.id,
+            title: event.task.title,
+            dueDate: event.task.dueDate!,
+          );
+        } else {
+          await notificationService.cancelTaskReminder(event.task.id);
+        }
       }
     } catch (e) {
       emit(TaskError(e.toString()));
@@ -163,8 +173,8 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
             );
             await repository.addTask(nextTask);
 
-            // Schedule notification for the new task
-            if (_notificationsEnabled) {
+            // GATED: Only schedule for top-level tasks
+            if (nextTask.parentId == null && _notificationsEnabled) {
               await notificationService.scheduleTaskReminder(
                 taskId: nextTask.id,
                 title: nextTask.title,
@@ -174,8 +184,10 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
           }
         }
       } else {
-        // Reopened
-        if (event.task.dueDate != null && _notificationsEnabled) {
+        // Reopened - GATED: Only for top-level tasks
+        if (event.task.parentId == null &&
+            event.task.dueDate != null &&
+            _notificationsEnabled) {
           await notificationService.scheduleTaskReminder(
             taskId: event.task.id,
             title: event.task.title,
@@ -214,6 +226,8 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
 
   Future<void> _onAddSubtask(AddSubtask event, Emitter<TaskState> emit) async {
     try {
+      // GATED: Notifications disabled for subtasks by requirement
+
       final now = DateTime.now();
       final subtask = TaskEntity(
         id: _uuid.v4(),

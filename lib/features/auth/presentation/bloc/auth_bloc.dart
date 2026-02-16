@@ -2,20 +2,26 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../../tasks/domain/repositories/task_repository.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
+  final TaskRepository _taskRepository;
   StreamSubscription? _authSubscription;
 
-  AuthBloc({required AuthRepository authRepository})
-    : _authRepository = authRepository,
-      super(AuthInitial()) {
+  AuthBloc({
+    required AuthRepository authRepository,
+    required TaskRepository taskRepository,
+  }) : _authRepository = authRepository,
+       _taskRepository = taskRepository,
+       super(AuthInitial()) {
     on<CheckAuthStatus>(_onCheckAuthStatus);
     on<SignInRequested>(_onSignIn);
     on<SignUpRequested>(_onSignUp);
@@ -61,7 +67,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       emit(Authenticated(user));
     } catch (e) {
-      print('Sign In Error: $e'); // Log the actual error
+      debugPrint('Sign In Error: $e'); // Log the actual error
       emit(AuthError(_mapError(e)));
     }
   }
@@ -76,7 +82,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       emit(Authenticated(user));
     } catch (e) {
-      print('Sign Up Error: $e'); // Log the actual error
+      debugPrint('Sign Up Error: $e'); // Log the actual error
       emit(AuthError(_mapError(e)));
     }
   }
@@ -87,6 +93,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     await _authRepository.signOut();
+    // Clear local task data on sign out to prevent data leakage between users
+    try {
+      await _taskRepository.clearLocalData();
+    } catch (e) {
+      debugPrint('Error clearing local data: $e');
+    }
     emit(Unauthenticated());
   }
 

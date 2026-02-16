@@ -35,18 +35,22 @@ Future<void> configureDependencies() async {
     () => TaskLocalDataSourceImpl(sl<Box<TaskModel>>()),
   );
   sl.registerLazySingleton<RemoteTaskDataSource>(
-    () => RemoteTaskDataSourceImpl(authRepository: sl<AuthRepository>()),
+    () => RemoteTaskDataSourceImpl(),
   );
   sl.registerLazySingleton<TaskRepository>(
     () => TaskRepositoryImpl(
       localDataSource: sl<TaskLocalDataSource>(),
       remoteDataSource: sl<RemoteTaskDataSource>(),
+      authRepository: sl<AuthRepository>(),
     ),
   );
 
   // ── Blocs ──
   sl.registerFactory<AuthBloc>(
-    () => AuthBloc(authRepository: sl<AuthRepository>()),
+    () => AuthBloc(
+      authRepository: sl<AuthRepository>(),
+      taskRepository: sl<TaskRepository>(),
+    ),
   );
   sl.registerFactory<TaskBloc>(
     () => TaskBloc(

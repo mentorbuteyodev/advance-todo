@@ -140,67 +140,63 @@ class ProfilePage extends StatelessWidget {
                               ),
                               child: BlocBuilder<ThemeCubit, ThemeState>(
                                 builder: (context, themeState) {
-                                  return Column(
-                                    children: [
-                                      _SettingsTile(
-                                        icon: Icons.light_mode_rounded,
-                                        title: 'Light Mode',
-                                        trailing: Radio<AppThemeMode>(
-                                          value: AppThemeMode.light,
-                                          groupValue: themeState.themeMode,
-                                          onChanged: (val) {
-                                            context
-                                                .read<ThemeCubit>()
-                                                .updateTheme(val!);
-                                          },
+                                  return RadioGroup<AppThemeMode>(
+                                    groupValue: themeState.themeMode,
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        context.read<ThemeCubit>().updateTheme(
+                                          val,
+                                        );
+                                      }
+                                    },
+                                    child: Column(
+                                      children: [
+                                        _SettingsTile(
+                                          icon: Icons.light_mode_rounded,
+                                          title: 'Light Mode',
+                                          trailing: const Radio<AppThemeMode>(
+                                            value: AppThemeMode.light,
+                                          ),
+                                          onTap: () => context
+                                              .read<ThemeCubit>()
+                                              .updateTheme(AppThemeMode.light),
                                         ),
-                                        onTap: () => context
-                                            .read<ThemeCubit>()
-                                            .updateTheme(AppThemeMode.light),
-                                      ),
-                                      Divider(
-                                        height: 1,
-                                        indent: 56,
-                                        color: theme.dividerColor.withAlpha(20),
-                                      ),
-                                      _SettingsTile(
-                                        icon: Icons.dark_mode_rounded,
-                                        title: 'Dark Mode',
-                                        trailing: Radio<AppThemeMode>(
-                                          value: AppThemeMode.dark,
-                                          groupValue: themeState.themeMode,
-                                          onChanged: (val) {
-                                            context
-                                                .read<ThemeCubit>()
-                                                .updateTheme(val!);
-                                          },
+                                        Divider(
+                                          height: 1,
+                                          indent: 56,
+                                          color: theme.dividerColor.withAlpha(
+                                            20,
+                                          ),
                                         ),
-                                        onTap: () => context
-                                            .read<ThemeCubit>()
-                                            .updateTheme(AppThemeMode.dark),
-                                      ),
-                                      Divider(
-                                        height: 1,
-                                        indent: 56,
-                                        color: theme.dividerColor.withAlpha(20),
-                                      ),
-                                      _SettingsTile(
-                                        icon: Icons.brightness_auto_rounded,
-                                        title: 'System Default',
-                                        trailing: Radio<AppThemeMode>(
-                                          value: AppThemeMode.system,
-                                          groupValue: themeState.themeMode,
-                                          onChanged: (val) {
-                                            context
-                                                .read<ThemeCubit>()
-                                                .updateTheme(val!);
-                                          },
+                                        _SettingsTile(
+                                          icon: Icons.dark_mode_rounded,
+                                          title: 'Dark Mode',
+                                          trailing: const Radio<AppThemeMode>(
+                                            value: AppThemeMode.dark,
+                                          ),
+                                          onTap: () => context
+                                              .read<ThemeCubit>()
+                                              .updateTheme(AppThemeMode.dark),
                                         ),
-                                        onTap: () => context
-                                            .read<ThemeCubit>()
-                                            .updateTheme(AppThemeMode.system),
-                                      ),
-                                    ],
+                                        Divider(
+                                          height: 1,
+                                          indent: 56,
+                                          color: theme.dividerColor.withAlpha(
+                                            20,
+                                          ),
+                                        ),
+                                        _SettingsTile(
+                                          icon: Icons.brightness_auto_rounded,
+                                          title: 'System Default',
+                                          trailing: const Radio<AppThemeMode>(
+                                            value: AppThemeMode.system,
+                                          ),
+                                          onTap: () => context
+                                              .read<ThemeCubit>()
+                                              .updateTheme(AppThemeMode.system),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 },
                               ),
