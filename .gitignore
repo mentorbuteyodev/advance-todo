@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Agent & AI traces
+.agent/
+.gemini/
+analyze_output.txt
+*.txt.metadata.json
+*.md.metadata.json
+*.md.resolved*
