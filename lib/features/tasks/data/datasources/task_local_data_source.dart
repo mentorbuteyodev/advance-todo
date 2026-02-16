@@ -14,6 +14,15 @@ abstract class TaskLocalDataSource {
   Future<void> deleteTask(String id);
   Future<List<TaskModel>> searchTasks(String query);
   Stream<List<TaskModel>> watchTasks();
+
+  /// Get all tasks including soft-deleted ones (for sync).
+  Future<List<TaskModel>> getAllTasksRaw();
+
+  /// Get tasks that have local changes not yet pushed to remote.
+  Future<List<TaskModel>> getPendingSyncTasks();
+
+  /// Permanently remove a task from local storage (after remote delete confirmed).
+  Future<void> purgeTask(String id);
 }
 
 class TaskLocalDataSourceImpl implements TaskLocalDataSource {
@@ -24,12 +33,14 @@ class TaskLocalDataSourceImpl implements TaskLocalDataSource {
   TaskLocalDataSourceImpl(this._taskBox);
 
   void _emitTasks() {
-    _taskStreamController.add(_taskBox.values.toList());
+    // Only emit non-deleted tasks to the UI stream
+    final tasks = _taskBox.values.where((t) => !t.isDeleted).toList();
+    _taskStreamController.add(tasks);
   }
 
   @override
   Future<List<TaskModel>> getTasks({String? parentId}) async {
-    final tasks = _taskBox.values.toList();
+    final tasks = _taskBox.values.where((t) => !t.isDeleted).toList();
     if (parentId != null) {
       return tasks.where((t) => t.parentId == parentId).toList();
     }
@@ -75,9 +86,10 @@ class TaskLocalDataSourceImpl implements TaskLocalDataSource {
     return _taskBox.values
         .where(
           (t) =>
-              t.title.toLowerCase().contains(lowerQuery) ||
-              t.description.toLowerCase().contains(lowerQuery) ||
-              t.tags.any((tag) => tag.toLowerCase().contains(lowerQuery)),
+              !t.isDeleted &&
+              (t.title.toLowerCase().contains(lowerQuery) ||
+                  t.description.toLowerCase().contains(lowerQuery) ||
+                  t.tags.any((tag) => tag.toLowerCase().contains(lowerQuery))),
         )
         .toList();
   }
@@ -87,6 +99,22 @@ class TaskLocalDataSourceImpl implements TaskLocalDataSource {
     // Emit current state immediately
     Future.microtask(_emitTasks);
     return _taskStreamController.stream;
+  }
+
+  @override
+  Future<List<TaskModel>> getAllTasksRaw() async {
+    return _taskBox.values.toList();
+  }
+
+  @override
+  Future<List<TaskModel>> getPendingSyncTasks() async {
+    return _taskBox.values.where((t) => t.pendingSync).toList();
+  }
+
+  @override
+  Future<void> purgeTask(String id) async {
+    await _taskBox.delete(id);
+    _emitTasks();
   }
 
   static Future<Box<TaskModel>> openBox() async {

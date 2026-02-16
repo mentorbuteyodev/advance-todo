@@ -1,0 +1,114 @@
+{
+  "@@locale": "en",
+  "appTitle": "TaskFlow",
+  "taskFlow": "TaskFlow",
+
+  "login": "Login",
+  "register": "Register",
+  "email": "Email",
+  "password": "Password",
+  "confirmPassword": "Confirm Password",
+  "displayName": "Display Name",
+  "forgotPassword": "Forgot Password?",
+  "dontHaveAccount": "Don't have an account?",
+  "alreadyHaveAccount": "Already have an account?",
+  "signUp": "Sign Up",
+  "signIn": "Sign In",
+  "signOut": "Sign Out",
+  "loginSubtitle": "Welcome back! Sign in to continue.",
+  "registerSubtitle": "Create an account to get started.",
+
+  "profile": "Profile",
+  "editProfile": "Edit Profile",
+  "changePassword": "Change Password",
+  "currentPassword": "Current Password",
+  "newPassword": "New Password",
+  "darkMode": "Dark Mode",
+  "notifications": "Notifications",
+  "taskReminders": "Task Reminders",
+  "appearance": "Appearance",
+  "account": "Account",
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "update": "Update",
+
+  "tasks": "Tasks",
+  "addTask": "Add Task",
+  "editTask": "Edit Task",
+  "deleteTask": "Delete Task",
+  "taskTitle": "Task title",
+  "taskDescription": "Description (optional)",
+  "dueDate": "Due Date",
+  "priority": "Priority",
+  "tags": "Tags",
+  "addTag": "Add tag",
+  "subtasks": "Subtasks",
+  "addSubtask": "Add subtask",
+  "noTasks": "No tasks yet",
+  "noTasksSubtitle": "Tap + to create your first task",
+  "searchTasks": "Search tasks...",
+  "createTask": "Create Task",
+
+  "filterAll": "All",
+  "filterToday": "Today",
+  "filterUpcoming": "Upcoming",
+  "filterCompleted": "Completed",
+
+  "priorityNone": "None",
+  "priorityLow": "Low",
+  "priorityMedium": "Medium",
+  "priorityHigh": "High",
+  "priorityUrgent": "Urgent",
+
+  "statusTodo": "To Do",
+  "statusInProgress": "In Progress",
+  "statusCompleted": "Completed",
+
+  "deleteConfirmTitle": "Delete Task",
+  "deleteConfirmMessage": "Are you sure you want to delete \"{title}\"? This will also delete all subtasks.",
+  "@deleteConfirmMessage": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+
+  "reminderSet": "Reminder Set",
+  "reminderSetBody": "You'll be reminded about \"{title}\" 30 min before it's due",
+  "@reminderSetBody": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+
+  "tasksDueReminder": "Task Reminder",
+  "taskDueNow": "Task Due Now!",
+  "taskDueIn30": "{title} is due in 30 minutes",
+  "@taskDueIn30": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "taskDueNowBody": "{title} is due right now",
+  "@taskDueNowBody": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+
+  "completedProgress": "{completed}/{total} completed",
+  "@completedProgress": {
+    "placeholders": {
+      "completed": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "overdue": "Overdue",
+  "inProgress": "In Progress",
+  "completed": "Completed",
+  "recurring": "Recurring",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly"
+}

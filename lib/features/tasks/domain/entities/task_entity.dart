@@ -22,6 +22,8 @@ class TaskEntity extends Equatable {
   final bool isRecurring;
   final String? recurringPattern; // e.g., 'daily', 'weekly', 'monthly'
   final int sortOrder;
+  final bool isDeleted;
+  final bool pendingSync;
 
   const TaskEntity({
     required this.id,
@@ -38,6 +40,8 @@ class TaskEntity extends Equatable {
     this.isRecurring = false,
     this.recurringPattern,
     this.sortOrder = 0,
+    this.isDeleted = false,
+    this.pendingSync = false,
   });
 
   bool get isCompleted => status == TaskStatus.completed;
@@ -60,6 +64,8 @@ class TaskEntity extends Equatable {
     bool? isRecurring,
     String? recurringPattern,
     int? sortOrder,
+    bool? isDeleted,
+    bool? pendingSync,
   }) {
     return TaskEntity(
       id: id ?? this.id,
@@ -76,6 +82,8 @@ class TaskEntity extends Equatable {
       isRecurring: isRecurring ?? this.isRecurring,
       recurringPattern: recurringPattern ?? this.recurringPattern,
       sortOrder: sortOrder ?? this.sortOrder,
+      isDeleted: isDeleted ?? this.isDeleted,
+      pendingSync: pendingSync ?? this.pendingSync,
     );
   }
 
@@ -95,5 +103,7 @@ class TaskEntity extends Equatable {
     isRecurring,
     recurringPattern,
     sortOrder,
+    isDeleted,
+    pendingSync,
   ];
 }

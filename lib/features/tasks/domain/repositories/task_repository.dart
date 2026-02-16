@@ -34,4 +34,7 @@ abstract class TaskRepository {
 
   /// Watch all tasks (reactive stream).
   Stream<List<TaskEntity>> watchTasks();
+
+  /// Trigger a full bidirectional sync with remote.
+  Future<void> syncNow();
 }

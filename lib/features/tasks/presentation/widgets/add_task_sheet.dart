@@ -23,6 +23,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   final _tagController = TextEditingController();
   TaskPriority _selectedPriority = TaskPriority.none;
   DateTime? _selectedDate;
+  String _selectedRecurrence = 'None';
   final List<String> _tags = [];
   final _formKey = GlobalKey<FormState>();
 
@@ -43,6 +44,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           priority: _selectedPriority,
           dueDate: _selectedDate,
           tags: _tags,
+          isRecurring: _selectedRecurrence != 'None',
+          recurringPattern: _selectedRecurrence != 'None'
+              ? _selectedRecurrence.toLowerCase()
+              : null,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -179,6 +184,57 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                         child: Text(
                           priority.name[0].toUpperCase() +
                               priority.name.substring(1),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isSelected
+                                ? color
+                                : theme.colorScheme.onSurface.withAlpha(150),
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Recurrence Selector ──
+              Text(
+                'Repeat',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withAlpha(150),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: ['None', 'Daily', 'Weekly', 'Monthly'].map((option) {
+                  final isSelected = _selectedRecurrence == option;
+                  final color = AppTheme.primaryColor;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedRecurrence = option),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? color.withAlpha(40)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? color : theme.dividerColor,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Text(
+                          option,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: isSelected
                                 ? color

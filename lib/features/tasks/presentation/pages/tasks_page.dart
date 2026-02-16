@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/task_bloc.dart';
@@ -19,6 +20,7 @@ class TasksPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent, // allow gradient to show
       body: const _TasksBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -38,159 +40,402 @@ class TasksPage extends StatelessWidget {
   }
 }
 
-class _TasksBody extends StatelessWidget {
+class _TasksBody extends StatefulWidget {
   const _TasksBody();
+
+  @override
+  State<_TasksBody> createState() => _TasksBodyState();
+}
+
+class _TasksBodyState extends State<_TasksBody> {
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  // Header Animation State
+  double _headerOffset = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.offset;
+    // Cap the offset at 100 which is roughly the height we want to collapse by
+    if (offset < 0) {
+      if (_headerOffset != 0) setState(() => _headerOffset = 0);
+    } else if (offset <= 100) {
+      setState(() => _headerOffset = offset);
+    } else if (_headerOffset != 100) {
+      setState(() => _headerOffset = 100);
+    }
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        context.read<TaskBloc>().add(const SearchQueryChanged(''));
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return BlocBuilder<TaskBloc, TaskState>(
-      builder: (context, state) {
-        return CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            // ── App Bar ──
-            SliverAppBar(
-              expandedHeight: 200,
-              pinned: true,
-              stretch: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.headerGradient,
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'TaskFlow',
-                                style: theme.textTheme.headlineLarge?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1,
+    // Calculate animation values
+    // as we scroll down (offset goes up), progress card opacity goes down
+    final double progressOpacity = (1.0 - (_headerOffset / 80)).clamp(0.0, 1.0);
+    final double headerHeightReduction = _headerOffset.clamp(0.0, 80.0);
+
+    // Main Gradient Container acting as the substantial background
+    return Container(
+      decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
+      child: SafeArea(
+        bottom: false, // Let the sheet go to the bottom
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Fixed Header ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row (Animated Title/Search Swap + Profile)
+                  SizedBox(
+                    height: 56,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.2, 0),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
                                 ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(30),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Icon(
-                                  Icons.search_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              ),
-                            ],
+                              );
+                            },
+                            child: _isSearching
+                                ? PhysicalModel(
+                                    key: const ValueKey('search_field'),
+                                    color: Colors.white,
+                                    elevation: 4,
+                                    shadowColor: Colors.black.withAlpha(50),
+                                    borderRadius: BorderRadius.circular(30),
+                                    child: TextField(
+                                      controller: _searchController,
+                                      autofocus: true,
+                                      style: GoogleFonts.inter(
+                                        color: const Color(0xFF2D3436),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      cursorColor: theme.primaryColor,
+                                      decoration: InputDecoration(
+                                        fillColor: Colors.white,
+                                        filled: true,
+                                        hintText: 'Search tasks...',
+                                        hintStyle: GoogleFonts.inter(
+                                          color: const Color(0xFFB2BEC3),
+                                          fontSize: 15,
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.search_rounded,
+                                          color: theme.primaryColor,
+                                          size: 22,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(
+                                            Icons.close_rounded,
+                                            color: Color(0xFF636E72),
+                                            size: 20,
+                                          ),
+                                          onPressed: _toggleSearch,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                          borderSide: const BorderSide(
+                                            color: Color(0xFFDFE6E9),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
+                                      ),
+                                      onChanged: (value) {
+                                        context.read<TaskBloc>().add(
+                                          SearchQueryChanged(value),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'TaskFlow',
+                                      key: const ValueKey('app_title'),
+                                      style: theme.textTheme.headlineLarge
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -1,
+                                          ),
+                                    ),
+                                  ),
                           ),
-                          const Spacer(),
-                          // ── Progress Indicator ──
-                          if (state is TaskLoaded) ...[
-                            _ProgressCard(
-                              completedCount: state.completedCount,
-                              totalCount: state.totalCount,
-                              completionRate: state.completionRate,
+                        ),
+
+                        // Right Side Icons
+                        Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: !_isSearching
+                                  ? Row(
+                                      key: const ValueKey('header_actions'),
+                                      children: [
+                                        IconButton(
+                                          onPressed: _toggleSearch,
+                                          icon: const Icon(
+                                            Icons.search_rounded,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                    )
+                                  : const SizedBox(
+                                      key: ValueKey('header_spacer'),
+                                      width: 8,
+                                    ),
+                            ),
+                            Hero(
+                              tag: 'profile_btn',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => context.push('/profile'),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(30),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
-                          const SizedBox(height: 16),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+
+                  // Progress Card (Animated Height Collapse)
+                  BlocBuilder<TaskBloc, TaskState>(
+                    builder: (context, state) {
+                      // Determine target height: 0 if searching, else based on scroll
+                      // Check for loading state to avoid jank
+                      final shouldShow = state is TaskLoaded && !_isSearching;
+                      final double targetHeight = shouldShow
+                          ? (90 - headerHeightReduction).clamp(0.0, 90.0)
+                          : 0.0;
+
+                      // Also animate margin to 0 when collapsed
+                      final double targetMargin = shouldShow
+                          ? (24 - (headerHeightReduction / 3)).clamp(0.0, 24.0)
+                          : 0.0;
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOutCubic,
+                        height: targetHeight,
+                        margin: EdgeInsets.only(
+                          top: shouldShow ? targetMargin : 0,
+                          bottom: shouldShow ? targetMargin : 16,
+                        ),
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: state is TaskLoaded
+                              ? Opacity(
+                                  // Opacity is also driven by scroll, but force 0 if searching
+                                  opacity: _isSearching ? 0.0 : progressOpacity,
+                                  child: _ProgressCard(
+                                    completedCount: state.completedCount,
+                                    totalCount: state.totalCount,
+                                    completionRate: state.completionRate,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
 
-            // ── Filter Tabs ──
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: _FilterTabs(
-                  activeFilter: state is TaskLoaded
-                      ? state.activeFilter
-                      : TaskFilter.all,
+            // ── Floating Sheet ──
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(30),
+                  ),
                 ),
-              ),
-            ),
-
-            // ── Task List ──
-            if (state is TaskLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (state is TaskLoaded && state.filteredTasks.isEmpty)
-              SliverFillRemaining(
-                child: _EmptyState(filter: state.activeFilter),
-              )
-            else if (state is TaskLoaded)
-              SliverPadding(
-                padding: const EdgeInsets.only(bottom: 100),
-                sliver: AnimationLimiter(
-                  child: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final task = state.filteredTasks[index];
-                      return AnimationConfiguration.staggeredList(
-                        position: index,
-                        duration: const Duration(milliseconds: 375),
-                        child: SlideAnimation(
-                          verticalOffset: 40.0,
-                          child: FadeInAnimation(
-                            child: TaskItem(
-                              task: task,
-                              onToggle: () => context.read<TaskBloc>().add(
-                                ToggleTaskStatus(task),
-                              ),
-                              onDelete: () => context.read<TaskBloc>().add(
-                                DeleteTask(task.id),
-                              ),
-                              onTap: () => context.push('/tasks/${task.id}'),
+                clipBehavior: Clip.hardEdge,
+                child: BlocBuilder<TaskBloc, TaskState>(
+                  builder: (context, state) {
+                    return CustomScrollView(
+                      controller: _scrollController,
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        // Filter Tabs (Pinned to top of sheet?)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                            child: _FilterTabs(
+                              activeFilter: state is TaskLoaded
+                                  ? state.activeFilter
+                                  : TaskFilter.all,
                             ),
                           ),
                         ),
-                      );
-                    }, childCount: state.filteredTasks.length),
-                  ),
-                ),
-              )
-            else if (state is TaskError)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline_rounded,
-                        size: 48,
-                        color: AppTheme.errorColor,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Something went wrong',
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(state.message, style: theme.textTheme.bodyMedium),
-                    ],
-                  ),
+
+                        // List Content
+                        if (state is TaskLoading)
+                          const SliverFillRemaining(
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (state is TaskLoaded &&
+                            state.filteredTasks.isEmpty)
+                          SliverFillRemaining(
+                            child: _EmptyState(filter: state.activeFilter),
+                          )
+                        else if (state is TaskLoaded)
+                          SliverPadding(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            // Key forces re-animation when filter changes
+                            sliver: AnimationLimiter(
+                              key: ValueKey(
+                                '${state.activeFilter}_${state.filteredTasks.length}',
+                              ),
+                              child: SliverList(
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  final task = state.filteredTasks[index];
+                                  return AnimationConfiguration.staggeredList(
+                                    position: index,
+                                    duration: const Duration(milliseconds: 375),
+                                    child: SlideAnimation(
+                                      verticalOffset: 50.0,
+                                      child: FadeInAnimation(
+                                        child: ScaleAnimation(
+                                          scale: 0.95,
+                                          child: TaskItem(
+                                            task: task,
+                                            onToggle: () => context
+                                                .read<TaskBloc>()
+                                                .add(ToggleTaskStatus(task)),
+                                            onDelete: () => context
+                                                .read<TaskBloc>()
+                                                .add(DeleteTask(task.id)),
+                                            onTap: () => context.push(
+                                              '/tasks/${task.id}',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }, childCount: state.filteredTasks.length),
+                              ),
+                            ),
+                          )
+                        else if (state is TaskError)
+                          SliverFillRemaining(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 48,
+                                    color: AppTheme.errorColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Something went wrong',
+                                    style: theme.textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    state.message,
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
-
-            // ── FAB spacer ──
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -210,7 +455,9 @@ class _ProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      // Fixed height to avoid jumps during opacity transition handled by parent
+      height: 80,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(25),
         borderRadius: BorderRadius.circular(16),
@@ -246,6 +493,7 @@ class _ProgressCard extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
                   'Today\'s Progress',

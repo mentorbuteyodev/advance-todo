@@ -52,34 +52,33 @@ class TaskItem extends StatelessWidget {
             ),
           ],
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: theme.cardTheme.color,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: task.isOverdue
-                      ? AppTheme.errorColor.withAlpha(80)
-                      : theme.dividerColor.withAlpha(40),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(8),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+        child: _ScaleButton(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: task.isOverdue
+                    ? AppTheme.errorColor.withAlpha(80)
+                    : theme.dividerColor.withAlpha(40),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Priority Line ──
-                  Container(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(8),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Priority Line (Hero) ──
+                Hero(
+                  tag: 'priority_${task.id}',
+                  child: Container(
                     width: 4,
                     height: 44,
                     margin: const EdgeInsets.only(right: 12),
@@ -88,127 +87,183 @@ class TaskItem extends StatelessWidget {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
+                ),
 
-                  // ── Checkbox ──
-                  GestureDetector(
-                    onTap: onToggle,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutBack,
-                      width: 26,
-                      height: 26,
-                      margin: const EdgeInsets.only(right: 12, top: 2),
-                      decoration: BoxDecoration(
+                // ── Checkbox (Animated) ──
+                _ScaleButton(
+                  onTap: onToggle,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutBack,
+                    width: 26,
+                    height: 26,
+                    margin: const EdgeInsets.only(right: 12, top: 2),
+                    decoration: BoxDecoration(
+                      color: task.isCompleted
+                          ? AppTheme.successColor
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
                         color: task.isCompleted
                             ? AppTheme.successColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: task.isCompleted
-                              ? AppTheme.successColor
-                              : theme.dividerColor,
-                          width: 2,
+                            : theme.dividerColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: task.isCompleted
+                        ? const Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ),
+
+                // ── Content ──
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title (Hero)
+                      Hero(
+                        tag: 'title_${task.id}',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 250),
+                            style: theme.textTheme.bodyLarge!.copyWith(
+                              fontWeight: FontWeight.w600,
+                              decoration: task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: task.isCompleted
+                                  ? theme.colorScheme.onSurface.withAlpha(100)
+                                  : theme.colorScheme.onSurface,
+                            ),
+                            child: Text(task.title),
+                          ),
                         ),
                       ),
-                      child: task.isCompleted
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 16,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                  ),
 
-                  // ── Content ──
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title
-                        AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 250),
-                          style: theme.textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.w600,
-                            decoration: task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: task.isCompleted
-                                ? theme.colorScheme.onSurface.withAlpha(100)
-                                : theme.colorScheme.onSurface,
+                      // Description
+                      if (task.description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          task.description,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(120),
                           ),
-                          child: Text(task.title),
-                        ),
-
-                        // Description
-                        if (task.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            task.description,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface.withAlpha(120),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-
-                        const SizedBox(height: 8),
-
-                        // ── Meta Row: Due date, Tags, Subtasks ──
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            // Due date
-                            if (task.dueDate != null)
-                              _MetaChip(
-                                icon: Icons.schedule_rounded,
-                                label: DateFormat(
-                                  'MMM d',
-                                ).format(task.dueDate!),
-                                color: task.isOverdue
-                                    ? AppTheme.errorColor
-                                    : AppTheme.primaryColor,
-                              ),
-
-                            // Subtask count
-                            if (task.subtasks.isNotEmpty)
-                              _MetaChip(
-                                icon: Icons.subdirectory_arrow_right_rounded,
-                                label:
-                                    '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length}',
-                                color: AppTheme.secondaryColor,
-                              ),
-
-                            // Tags
-                            ...task.tags
-                                .take(2)
-                                .map(
-                                  (tag) => _MetaChip(
-                                    icon: Icons.tag_rounded,
-                                    label: tag,
-                                    color: AppTheme.primaryLight,
-                                  ),
-                                ),
-
-                            if (task.tags.length > 2)
-                              _MetaChip(
-                                icon: Icons.more_horiz_rounded,
-                                label: '+${task.tags.length - 2}',
-                                color: AppTheme.primaryLight,
-                              ),
-                          ],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ),
+
+                      const SizedBox(height: 8),
+
+                      // ── Meta Row ──
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (task.dueDate != null)
+                            _MetaChip(
+                              icon: Icons.schedule_rounded,
+                              label: DateFormat('MMM d').format(task.dueDate!),
+                              color: task.isOverdue
+                                  ? AppTheme.errorColor
+                                  : AppTheme.primaryColor,
+                            ),
+                          if (task.subtasks.isNotEmpty)
+                            _MetaChip(
+                              icon: Icons.subdirectory_arrow_right_rounded,
+                              label:
+                                  '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length}',
+                              color: AppTheme.secondaryColor,
+                            ),
+                          ...task.tags
+                              .take(2)
+                              .map(
+                                (tag) => _MetaChip(
+                                  icon: Icons.tag_rounded,
+                                  label: tag,
+                                  color: AppTheme.primaryLight,
+                                ),
+                              ),
+                          if (task.tags.length > 2)
+                            _MetaChip(
+                              icon: Icons.more_horiz_rounded,
+                              label: '+${task.tags.length - 2}',
+                              color: AppTheme.primaryLight,
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Scale Button (Micro-interaction) ──
+class _ScaleButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _ScaleButton({required this.child, this.onTap});
+
+  @override
+  State<_ScaleButton> createState() => _ScaleButtonState();
+}
+
+class _ScaleButtonState extends State<_ScaleButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final Duration _duration = const Duration(milliseconds: 100);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: _duration,
+      lowerBound: 0.95,
+      upperBound: 1.0,
+    );
+    _controller.value = 1.0;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    _controller.reverse();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    _controller.forward();
+    widget.onTap?.call();
+  }
+
+  void _onTapCancel() {
+    _controller.forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: ScaleTransition(scale: _controller, child: widget.child),
     );
   }
 }

@@ -1,5 +1,5 @@
 // Notification Service - Handles local notification scheduling for task reminders.
-// Schedules a notification 30 minutes before a task's due date.
+// Schedules notifications: on creation, 30 minutes before due, and at due time.
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -21,38 +21,88 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
-    tzdata.initializeTimeZones();
+    try {
+      tzdata.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
 
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+      const settings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
 
-    await _plugin.initialize(settings: settings);
+      final result = await _plugin.initialize(settings: settings);
+      debugPrint('🔔 Notification plugin initialized: $result');
 
-    // Request notification permission on Android 13+
-    if (Platform.isAndroid) {
-      final androidPlugin = _plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      if (androidPlugin != null) {
-        await androidPlugin.requestNotificationsPermission();
+      // Request notification permission on Android 13+
+      if (Platform.isAndroid) {
+        final androidPlugin = _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        if (androidPlugin != null) {
+          final granted = await androidPlugin.requestNotificationsPermission();
+          debugPrint('🔔 Notification permission granted: $granted');
+
+          // Request exact alarm permission (Android 12+)
+          final exactAlarmGranted = await androidPlugin
+              .requestExactAlarmsPermission();
+          debugPrint('🔔 Exact alarm permission granted: $exactAlarmGranted');
+        }
       }
-    }
 
-    _initialized = true;
+      _initialized = true;
+      debugPrint('✅ NotificationService fully initialized');
+    } catch (e, stack) {
+      debugPrint('❌ NotificationService init failed: $e');
+      debugPrint('Stack: $stack');
+      // Still mark as initialized to prevent infinite retry loops
+      // Individual notification calls will handle their own errors
+      _initialized = true;
+    }
   }
+
+  /// Ensure the service is initialized before any operation.
+  Future<bool> _ensureInitialized() async {
+    if (!_initialized) {
+      await init();
+    }
+    return _initialized;
+  }
+
+  // ── Notification Details ─────────────────────────────────────
+
+  static const _androidDetails = AndroidNotificationDetails(
+    'task_reminders',
+    'Task Reminders',
+    channelDescription: 'Reminders for upcoming task due dates',
+    importance: Importance.high,
+    priority: Priority.high,
+    icon: '@mipmap/ic_launcher',
+    enableVibration: true,
+    playSound: true,
+  );
+
+  static const _iosDetails = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+  );
+
+  static const _notificationDetails = NotificationDetails(
+    android: _androidDetails,
+    iOS: _iosDetails,
+  );
+
+  // ── Public API ───────────────────────────────────────────────
 
   /// Schedule reminder notifications for a task:
   /// 1) 30 minutes before due date
@@ -62,105 +112,91 @@ class NotificationService {
     required String title,
     required DateTime dueDate,
   }) async {
-    if (!_initialized) await init();
+    if (!await _ensureInitialized()) return;
 
-    const androidDetails = AndroidNotificationDetails(
-      'task_reminders',
-      'Task Reminders',
-      channelDescription: 'Reminders for upcoming task due dates',
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    // Cancel any existing reminders for this task
-    await _plugin.cancel(id: taskId.hashCode);
-    await _plugin.cancel(id: taskId.hashCode + 1);
+    // Cancel any existing reminders for this task first
+    await cancelTaskReminder(taskId);
 
     final now = DateTime.now();
+    final idBase = taskId.hashCode.abs();
 
     // 1) Schedule 30-minute-before reminder
     final reminderTime = dueDate.subtract(const Duration(minutes: 30));
     if (reminderTime.isAfter(now)) {
-      await _plugin.zonedSchedule(
-        id: taskId.hashCode,
-        title: '⏰ Task Reminder',
-        body: '$title is due in 30 minutes',
-        scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
-      debugPrint('🔔 30-min reminder for "$title" scheduled');
+      try {
+        await _plugin.zonedSchedule(
+          id: idBase,
+          title: '⏰ Task Reminder',
+          body: '"$title" is due in 30 minutes',
+          scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
+          notificationDetails: _notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+        debugPrint(
+          '🔔 30-min reminder for "$title" scheduled at $reminderTime',
+        );
+      } catch (e) {
+        debugPrint('⚠️ Failed to schedule 30-min reminder: $e');
+      }
     }
 
     // 2) Schedule at-due-time notification
     if (dueDate.isAfter(now)) {
-      await _plugin.zonedSchedule(
-        id: taskId.hashCode + 1,
-        title: '📋 Task Due Now!',
-        body: '$title is due right now',
-        scheduledDate: tz.TZDateTime.from(dueDate, tz.local),
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
-      debugPrint('🔔 Due-time notification for "$title" scheduled');
+      try {
+        await _plugin.zonedSchedule(
+          id: idBase + 1,
+          title: '📋 Task Due Now!',
+          body: '"$title" is due right now',
+          scheduledDate: tz.TZDateTime.from(dueDate, tz.local),
+          notificationDetails: _notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+        debugPrint(
+          '🔔 Due-time notification for "$title" scheduled at $dueDate',
+        );
+      } catch (e) {
+        debugPrint('⚠️ Failed to schedule due-time notification: $e');
+      }
     }
   }
 
-  /// Show an immediate notification (used for confirmation feedback).
+  /// Show an immediate notification (used for task creation confirmation).
   Future<void> showImmediate({
     required String title,
     required String body,
   }) async {
-    if (!_initialized) await init();
+    if (!await _ensureInitialized()) return;
 
-    const androidDetails = AndroidNotificationDetails(
-      'task_reminders',
-      'Task Reminders',
-      channelDescription: 'Reminders for upcoming task due dates',
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-    );
-
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _plugin.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: title,
-      body: body,
-      notificationDetails: details,
-    );
+    try {
+      await _plugin.show(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: title,
+        body: body,
+        notificationDetails: _notificationDetails,
+      );
+      debugPrint('🔔 Immediate notification shown: $title');
+    } catch (e) {
+      debugPrint('⚠️ Failed to show immediate notification: $e');
+    }
   }
 
   /// Cancel all reminders for a specific task (both 30-min and due-time).
   Future<void> cancelTaskReminder(String taskId) async {
-    await _plugin.cancel(id: taskId.hashCode);
-    await _plugin.cancel(id: taskId.hashCode + 1);
+    final idBase = taskId.hashCode.abs();
+    try {
+      await _plugin.cancel(id: idBase);
+      await _plugin.cancel(id: idBase + 1);
+    } catch (e) {
+      debugPrint('⚠️ Failed to cancel notification: $e');
+    }
   }
 
   /// Cancel all scheduled reminders.
   Future<void> cancelAllReminders() async {
-    await _plugin.cancelAll();
+    try {
+      await _plugin.cancelAll();
+    } catch (e) {
+      debugPrint('⚠️ Failed to cancel all notifications: $e');
+    }
   }
 }

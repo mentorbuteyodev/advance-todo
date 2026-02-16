@@ -19,6 +19,7 @@ class TaskLoaded extends TaskState {
   final List<TaskEntity> tasks;
   final List<TaskEntity> filteredTasks;
   final TaskFilter activeFilter;
+  final String searchQuery;
   final int completedCount;
   final int totalCount;
 
@@ -26,6 +27,7 @@ class TaskLoaded extends TaskState {
     required this.tasks,
     required this.filteredTasks,
     this.activeFilter = TaskFilter.all,
+    this.searchQuery = '',
     this.completedCount = 0,
     this.totalCount = 0,
   });
@@ -37,6 +39,7 @@ class TaskLoaded extends TaskState {
     tasks,
     filteredTasks,
     activeFilter,
+    searchQuery,
     completedCount,
     totalCount,
   ];
