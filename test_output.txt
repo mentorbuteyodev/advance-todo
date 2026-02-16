@@ -1,0 +1,29 @@
+﻿
+00:00 +0: loading C:/Users/mento/Downloads/todo_test/test/features/tasks/task_bloc_test.dart                                                                                                           
+00:01 +0: loading C:/Users/mento/Downloads/todo_test/test/features/tasks/task_bloc_test.dart                                                                                                           
+00:02 +0: loading C:/Users/mento/Downloads/todo_test/test/features/tasks/task_bloc_test.dart                                                                                                           
+00:02 +0: (setUpAll)                                                                                                                                                                                   
+00:02 +0: TaskBloc initial state is TaskInitial                                                                                                                                                        
+00:02 +1: TaskBloc initial state is TaskInitial                                                                                                                                                        
+00:02 +1: TaskBloc emits [TaskLoaded] when LoadTasks is added and tasks are returned                                                                                                                   
+00:02 +2: TaskBloc emits [TaskLoaded] when LoadTasks is added and tasks are returned                                                                                                                   
+00:02 +2: TaskBloc emits [TaskLoaded] with empty list when no tasks exist                                                                                                                              
+00:02 +3: TaskBloc emits [TaskLoaded] with empty list when no tasks exist                                                                                                                              
+00:02 +3: TaskBloc calls repository.addTask when AddTask event is added                                                                                                                                
+00:02 +4: TaskBloc calls repository.addTask when AddTask event is added                                                                                                                                
+00:02 +4: TaskBloc calls repository.deleteTask when DeleteTask event is added                                                                                                                          
+00:02 +5: TaskBloc calls repository.deleteTask when DeleteTask event is added                                                                                                                          
+00:02 +5: TaskBloc calls repository.updateTask when ToggleTaskStatus is added                                                                                                                          
+00:02 +6: TaskBloc calls repository.updateTask when ToggleTaskStatus is added                                                                                                                          
+00:02 +6: TaskBloc emits [TaskLoaded] with filtered tasks when FilterTasks is added                                                                                                                    
+00:02 +7: TaskBloc emits [TaskLoaded] with filtered tasks when FilterTasks is added                                                                                                                    
+00:02 +7: TaskEntity copyWith creates a new instance with updated fields                                                                                                                               
+00:02 +8: TaskEntity copyWith creates a new instance with updated fields                                                                                                                               
+00:02 +8: TaskEntity isCompleted returns true when status is completed                                                                                                                                 
+00:02 +9: TaskEntity isCompleted returns true when status is completed                                                                                                                                 
+00:02 +9: TaskEntity isOverdue returns true for past due date on incomplete task                                                                                                                       
+00:02 +10: TaskEntity isOverdue returns true for past due date on incomplete task                                                                                                                      
+00:02 +10: TaskEntity isOverdue returns false for completed task                                                                                                                                       
+00:02 +11: TaskEntity isOverdue returns false for completed task                                                                                                                                       
+00:02 +11: (tearDownAll)                                                                                                                                                                               
+00:02 +11: All tests passed!                                                                                                                                                                           

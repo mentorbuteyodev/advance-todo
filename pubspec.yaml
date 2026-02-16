@@ -1,0 +1,54 @@
+name: todo_test
+description: "A production-grade, scalable Todo List application."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.8
+  google_fonts: any
+  flutter_animate: any
+  flutter_slidable: any
+  flutter_staggered_animations: any
+
+  # State Management
+  flutter_bloc: any
+  equatable: any
+
+  # Dependency Injection
+  get_it: any
+  injectable: any
+
+  # Navigation
+  go_router: any
+
+  # Local Database
+  hive_ce: any
+  hive_ce_flutter: any
+
+  # Utils
+  uuid: any
+  intl: any
+  path_provider: any
+  flutter_local_notifications: any
+  timezone: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  injectable_generator: any
+  build_runner: any
+  hive_ce_generator: any
+  bloc_test: any
+  mocktail: any
+
+flutter:
+  uses-material-design: true

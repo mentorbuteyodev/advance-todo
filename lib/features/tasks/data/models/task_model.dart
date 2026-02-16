@@ -1,0 +1,104 @@
+// Task Model - Data layer representation of a Task.
+// Handles serialization/deserialization for Hive storage.
+
+import 'package:hive_ce/hive.dart';
+import '../../domain/entities/task_entity.dart';
+
+part 'task_model.g.dart';
+
+@HiveType(typeId: 0)
+class TaskModel extends HiveObject {
+  @HiveField(0)
+  final String id;
+
+  @HiveField(1)
+  final String title;
+
+  @HiveField(2)
+  final String description;
+
+  @HiveField(3)
+  final int statusIndex; // Maps to TaskStatus enum
+
+  @HiveField(4)
+  final int priorityIndex; // Maps to TaskPriority enum
+
+  @HiveField(5)
+  final DateTime createdAt;
+
+  @HiveField(6)
+  final DateTime updatedAt;
+
+  @HiveField(7)
+  final DateTime? dueDate;
+
+  @HiveField(8)
+  final List<String> tags;
+
+  @HiveField(9)
+  final String? parentId;
+
+  @HiveField(10)
+  final bool isRecurring;
+
+  @HiveField(11)
+  final String? recurringPattern;
+
+  @HiveField(12)
+  final int sortOrder;
+
+  TaskModel({
+    required this.id,
+    required this.title,
+    this.description = '',
+    this.statusIndex = 0,
+    this.priorityIndex = 0,
+    required this.createdAt,
+    required this.updatedAt,
+    this.dueDate,
+    this.tags = const [],
+    this.parentId,
+    this.isRecurring = false,
+    this.recurringPattern,
+    this.sortOrder = 0,
+  });
+
+  /// Convert from Domain Entity to Data Model.
+  factory TaskModel.fromEntity(TaskEntity entity) {
+    return TaskModel(
+      id: entity.id,
+      title: entity.title,
+      description: entity.description,
+      statusIndex: entity.status.index,
+      priorityIndex: entity.priority.index,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      dueDate: entity.dueDate,
+      tags: List<String>.from(entity.tags),
+      parentId: entity.parentId,
+      isRecurring: entity.isRecurring,
+      recurringPattern: entity.recurringPattern,
+      sortOrder: entity.sortOrder,
+    );
+  }
+
+  /// Convert from Data Model to Domain Entity.
+  TaskEntity toEntity({List<TaskEntity> subtasks = const []}) {
+    return TaskEntity(
+      id: id,
+      title: title,
+      description: description,
+      status: TaskStatus.values[statusIndex],
+      priority: TaskPriority.values[priorityIndex],
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      dueDate: dueDate,
+      tags: List<String>.from(tags),
+      subtasks: subtasks,
+      parentId: parentId,
+      isRecurring: isRecurring,
+      recurringPattern: recurringPattern,
+      sortOrder: sortOrder,
+    );
+  }
+}
