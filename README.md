@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.icons8.com/3d-fluency/94/checklist.png" width="80" alt="TaskFlow Logo"/>
+  <img src="android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" width="80" alt="TaskFlow Logo"/>
 </p>
 
 <h1 align="center">TaskFlow</h1>
@@ -142,18 +142,18 @@ flutter test
 - [x] Offline support (Hive local DB)
 - [x] Premium UI with dark mode
 
-### 🔜 Milestone 2: Connectivity & Advanced Features
+### ✅ Milestone 2: Connectivity & Advanced Features (Complete)
 
-- [ ] User authentication (Email, Social)
-- [ ] Real-time sync across devices
-- [ ] Recurring tasks (Daily, Weekly, Custom)
-- [ ] Focus Mode (Pomodoro timer)
+- [x] User authentication (Email, Social)
+- [x] Real-time sync across devices
+- [x] Recurring tasks (Daily, Weekly, Custom)
+- [x] Focus Mode (Pomodoro timer)
 
-### 🔮 Milestone 3: AI & Intelligence
+### ✅ Milestone 3: AI & Intelligence (Complete)
 
-- [ ] Natural language input ("Buy milk tomorrow at 5pm")
-- [ ] Smart task prioritization
-- [ ] Productivity insights & analytics
+- [x] Natural language input ("Buy milk tomorrow at 5pm")
+- [x] Smart task prioritization
+- [x] Productivity insights & analytics
 
 ---
 
