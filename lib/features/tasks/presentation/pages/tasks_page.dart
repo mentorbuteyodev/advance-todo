@@ -55,7 +55,7 @@ class _TasksBodyState extends State<_TasksBody> {
   final ScrollController _scrollController = ScrollController();
 
   // Header Animation State
-  double _headerOffset = 0.0;
+  final ValueNotifier<double> _headerOffset = ValueNotifier<double>(0.0);
 
   @override
   void initState() {
@@ -68,6 +68,7 @@ class _TasksBodyState extends State<_TasksBody> {
     _searchController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _headerOffset.dispose();
     super.dispose();
   }
 
@@ -76,11 +77,11 @@ class _TasksBodyState extends State<_TasksBody> {
     final offset = _scrollController.offset;
     // Cap the offset at 100 which is roughly the height we want to collapse by
     if (offset < 0) {
-      if (_headerOffset != 0) setState(() => _headerOffset = 0);
+      if (_headerOffset.value != 0) _headerOffset.value = 0;
     } else if (offset <= 100) {
-      setState(() => _headerOffset = offset);
-    } else if (_headerOffset != 100) {
-      setState(() => _headerOffset = 100);
+      _headerOffset.value = offset;
+    } else if (_headerOffset.value != 100) {
+      _headerOffset.value = 100;
     }
   }
 
@@ -97,11 +98,6 @@ class _TasksBodyState extends State<_TasksBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Calculate animation values
-    // as we scroll down (offset goes up), progress card opacity goes down
-    final double progressOpacity = (1.0 - (_headerOffset / 80)).clamp(0.0, 1.0);
-    final double headerHeightReduction = _headerOffset.clamp(0.0, 80.0);
 
     // Main Gradient Container acting as the substantial background
     return BlocListener<AuthBloc, AuthState>(
@@ -288,46 +284,66 @@ class _TasksBodyState extends State<_TasksBody> {
 
                     // Progress Card (Animated Height Collapse)
                     BlocBuilder<TaskBloc, TaskState>(
+                      buildWhen: (previous, current) =>
+                          previous is! TaskLoaded ||
+                          current is! TaskLoaded ||
+                          previous.completedCount != current.completedCount ||
+                          previous.totalCount != current.totalCount,
                       builder: (context, state) {
-                        // Determine target height: 0 if searching, else based on scroll
-                        // Check for loading state to avoid jank
-                        final shouldShow = state is TaskLoaded && !_isSearching;
-                        final double targetHeight = shouldShow
-                            ? (90 - headerHeightReduction).clamp(0.0, 90.0)
-                            : 0.0;
+                        return ValueListenableBuilder<double>(
+                          valueListenable: _headerOffset,
+                          builder: (context, offset, _) {
+                            // Calculate animation values
+                            // as we scroll down (offset goes up), progress card opacity goes down
+                            final double progressOpacity = (1.0 - (offset / 80))
+                                .clamp(0.0, 1.0);
+                            final double headerHeightReduction = offset.clamp(
+                              0.0,
+                              80.0,
+                            );
 
-                        // Also animate margin to 0 when collapsed
-                        final double targetMargin = shouldShow
-                            ? (24 - (headerHeightReduction / 3)).clamp(
-                                0.0,
-                                24.0,
-                              )
-                            : 0.0;
+                            // Determine target height: 0 if searching, else based on scroll
+                            // Check for loading state to avoid jank
+                            final shouldShow =
+                                state is TaskLoaded && !_isSearching;
+                            final double targetHeight = shouldShow
+                                ? (90 - headerHeightReduction).clamp(0.0, 90.0)
+                                : 0.0;
 
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOutCubic,
-                          height: targetHeight,
-                          margin: EdgeInsets.only(
-                            top: shouldShow ? targetMargin : 0,
-                            bottom: shouldShow ? targetMargin : 16,
-                          ),
-                          child: SingleChildScrollView(
-                            physics: const NeverScrollableScrollPhysics(),
-                            child: state is TaskLoaded
-                                ? Opacity(
-                                    // Opacity is also driven by scroll, but force 0 if searching
-                                    opacity: _isSearching
-                                        ? 0.0
-                                        : progressOpacity,
-                                    child: _ProgressCard(
-                                      completedCount: state.completedCount,
-                                      totalCount: state.totalCount,
-                                      completionRate: state.completionRate,
-                                    ),
+                            // Also animate margin to 0 when collapsed
+                            final double targetMargin = shouldShow
+                                ? (24 - (headerHeightReduction / 3)).clamp(
+                                    0.0,
+                                    24.0,
                                   )
-                                : const SizedBox.shrink(),
-                          ),
+                                : 0.0;
+
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOutCubic,
+                              height: targetHeight,
+                              margin: EdgeInsets.only(
+                                top: shouldShow ? targetMargin : 0,
+                                bottom: shouldShow ? targetMargin : 16,
+                              ),
+                              child: SingleChildScrollView(
+                                physics: const NeverScrollableScrollPhysics(),
+                                child: state is TaskLoaded
+                                    ? Opacity(
+                                        // Opacity is also driven by scroll, but force 0 if searching
+                                        opacity: _isSearching
+                                            ? 0.0
+                                            : progressOpacity,
+                                        child: _ProgressCard(
+                                          completedCount: state.completedCount,
+                                          totalCount: state.totalCount,
+                                          completionRate: state.completionRate,
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -347,6 +363,13 @@ class _TasksBodyState extends State<_TasksBody> {
                   ),
                   clipBehavior: Clip.hardEdge,
                   child: BlocBuilder<TaskBloc, TaskState>(
+                    buildWhen: (previous, current) =>
+                        previous.runtimeType != current.runtimeType ||
+                        (previous is TaskLoaded &&
+                            current is TaskLoaded &&
+                            (previous.activeFilter != current.activeFilter ||
+                                previous.filteredTasks !=
+                                    current.filteredTasks)),
                     builder: (context, state) {
                       return CustomScrollView(
                         controller: _scrollController,
@@ -429,7 +452,7 @@ class _TasksBodyState extends State<_TasksBody> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.error_outline_rounded,
                                       size: 48,
                                       color: AppTheme.errorColor,

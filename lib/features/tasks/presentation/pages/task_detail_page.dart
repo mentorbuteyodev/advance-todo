@@ -12,6 +12,8 @@ import '../../domain/entities/task_entity.dart';
 import '../bloc/task_bloc.dart';
 import '../bloc/task_event.dart';
 import '../bloc/task_state.dart';
+import '../../../../core/services/smart_suggestion_service.dart';
+import '../../../../core/services/nlp_service.dart';
 
 class TaskDetailPage extends StatefulWidget {
   final String taskId;
@@ -29,6 +31,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   final _tagController = TextEditingController();
   bool _isEditingTitle = false;
   bool _isEditingDescription = false;
+  @override
+  void initState() {
+    super.initState();
+    // Controllers will be updated when task is loaded in build,
+    // but initialized here to avoid re-creation in build
+    _titleController = TextEditingController();
+    _descriptionController = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -167,9 +177,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           );
         }
 
-        // Initialize controllers with current task data
-        _titleController = TextEditingController(text: task.title);
-        _descriptionController = TextEditingController(text: task.description);
+        // Update controllers if not editing to reflect latest task state
+        if (!_isEditingTitle && _titleController.text != task.title) {
+          _titleController.text = task.title;
+        }
+        if (!_isEditingDescription &&
+            _descriptionController.text != task.description) {
+          _descriptionController.text = task.description;
+        }
 
         final theme = Theme.of(context);
         final priorityColor = AppTheme.priorityColor(task.priority.index);
@@ -484,6 +499,40 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               ),
                               const SizedBox(height: 24),
 
+                              // Smart Priority Suggestion
+                              if (task.priority == TaskPriority.none)
+                                _buildAISuggestionSection(
+                                  theme,
+                                  title: 'Suggested Priority',
+                                  child: _SuggestionChip(
+                                    icon: Icons.flag_rounded,
+                                    label:
+                                        (SmartSuggestionService.suggestPriority(
+                                                  task.title,
+                                                  task.description,
+                                                ) ??
+                                                TaskPriority.medium)
+                                            .name
+                                            .toUpperCase(),
+                                    onTap: () => _changePriority(
+                                      task,
+                                      SmartSuggestionService.suggestPriority(
+                                            task.title,
+                                            task.description,
+                                          ) ??
+                                          TaskPriority.medium,
+                                    ),
+                                    color: AppTheme.priorityColor(
+                                      (SmartSuggestionService.suggestPriority(
+                                                task.title,
+                                                task.description,
+                                              ) ??
+                                              TaskPriority.medium)
+                                          .index,
+                                    ),
+                                  ),
+                                ),
+
                               // Due Date
                               _SectionHeader(
                                 icon: Icons.calendar_today_rounded,
@@ -610,6 +659,83 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 12),
+                              (() {
+                                final allSuggestedTags = {
+                                  ...NLPService.parse(
+                                    _titleController.text,
+                                  ).tags,
+                                  ...SmartSuggestionService.suggestTags(
+                                    task.title,
+                                    task.description,
+                                  ),
+                                }.where((t) => !task.tags.contains(t)).toList();
+
+                                if (allSuggestedTags.isEmpty)
+                                  return const SizedBox.shrink();
+
+                                return _buildAISuggestionSection(
+                                  theme,
+                                  title: 'Suggested Tags',
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: allSuggestedTags
+                                          .map(
+                                            (tag) => _SuggestionChip(
+                                              icon: Icons.tag_rounded,
+                                              label: tag,
+                                              onTap: () {
+                                                final currentTitle =
+                                                    _titleController.text;
+                                                final tagRegex = RegExp(
+                                                  '#$tag\\b',
+                                                  caseSensitive: false,
+                                                );
+
+                                                if (currentTitle.contains(
+                                                  tagRegex,
+                                                )) {
+                                                  _titleController.text =
+                                                      currentTitle
+                                                          .replaceFirst(
+                                                            tagRegex,
+                                                            '',
+                                                          )
+                                                          .replaceAll(
+                                                            RegExp(r'\s+'),
+                                                            ' ',
+                                                          )
+                                                          .trim();
+                                                  // Maintain cursor
+                                                  _titleController.selection =
+                                                      TextSelection.fromPosition(
+                                                        TextPosition(
+                                                          offset:
+                                                              _titleController
+                                                                  .text
+                                                                  .length,
+                                                        ),
+                                                      );
+                                                  // Save the new title too
+                                                  _saveTitle(task);
+                                                }
+
+                                                context.read<TaskBloc>().add(
+                                                  UpdateTask(
+                                                    task.copyWith(
+                                                      tags: [...task.tags, tag],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ),
+                                );
+                              })(),
                               const SizedBox(height: 24),
 
                               // Subtasks
@@ -715,6 +841,83 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAISuggestionSection(
+    ThemeData theme, {
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withAlpha(15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primaryColor.withAlpha(30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 14,
+                color: AppTheme.primaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _SuggestionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activeColor = color ?? AppTheme.primaryColor;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(icon, size: 14, color: activeColor),
+        label: Text(label),
+        onPressed: onTap,
+        labelStyle: theme.textTheme.bodySmall?.copyWith(
+          color: activeColor,
+          fontWeight: FontWeight.bold,
+        ),
+        backgroundColor: activeColor.withAlpha(20),
+        side: BorderSide(color: activeColor.withAlpha(50)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        visualDensity: VisualDensity.compact,
+      ),
     );
   }
 }

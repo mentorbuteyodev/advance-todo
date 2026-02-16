@@ -9,6 +9,8 @@ import '../../domain/entities/task_entity.dart';
 import '../bloc/task_bloc.dart';
 import '../bloc/task_event.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/nlp_service.dart';
+import '../../../../core/services/smart_suggestion_service.dart';
 
 class AddTaskSheet extends StatefulWidget {
   const AddTaskSheet({super.key});
@@ -27,6 +29,98 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   final List<String> _tags = [];
   final _formKey = GlobalKey<FormState>();
 
+  // AI/NLP State
+  DateTime? _suggestedDate;
+  TaskPriority? _suggestedPriority;
+  List<String> _suggestedTags = [];
+  bool _isAutoParsing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController.addListener(_onTextChanged);
+    _descriptionController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    if (!_isAutoParsing) return;
+
+    final title = _titleController.text;
+    final desc = _descriptionController.text;
+
+    // 1. NLP Parse for Date/Time/Priority from Title
+    final nlp = NLPService.parse(title);
+
+    // 2. Smart Suggestions for Tags/Priority from Both
+    final smartPri = SmartSuggestionService.suggestPriority(title, desc);
+    final smartTags = SmartSuggestionService.suggestTags(title, desc);
+
+    setState(() {
+      _suggestedDate = nlp.dueDate;
+      _suggestedPriority = nlp.priority != TaskPriority.none
+          ? nlp.priority
+          : smartPri;
+
+      // Combine NLP tags and Smart Suggestions, filtering out already added tags
+      final allSuggestedTags = {
+        ...nlp.tags,
+        ...smartTags,
+      }.where((t) => !_tags.contains(t)).toList();
+
+      _suggestedTags = allSuggestedTags;
+    });
+  }
+
+  void _applySuggestion({DateTime? date, TaskPriority? priority, String? tag}) {
+    // If auto-parsing is on, we want to update the title to the "cleaned" version
+    // that NLPService provides, but only for the parts we are applying.
+    final currentTitle = _titleController.text;
+    final nlp = NLPService.parse(currentTitle);
+
+    setState(() {
+      if (date != null) {
+        _selectedDate = date;
+        _suggestedDate = null;
+        // If the date was parsed from NLP, we can use the cleaned title
+        if (nlp.dueDate != null) {
+          _titleController.text = nlp.title;
+          _titleController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _titleController.text.length),
+          );
+        }
+      }
+
+      if (priority != null) {
+        _selectedPriority = priority;
+        _suggestedPriority = null;
+        // If priority was parsed from NLP, update title
+        if (nlp.priority != TaskPriority.none) {
+          _titleController.text = nlp.title;
+          _titleController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _titleController.text.length),
+          );
+        }
+      }
+
+      if (tag != null && !_tags.contains(tag)) {
+        _tags.add(tag);
+        _suggestedTags.remove(tag);
+        // Surgical removal of the tag from the title if it exists as a #tag
+        final tagRegex = RegExp('#$tag\\b', caseSensitive: false);
+        if (currentTitle.contains(tagRegex)) {
+          _titleController.text = currentTitle
+              .replaceFirst(tagRegex, '')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+          // Maintain cursor at the end
+          _titleController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _titleController.text.length),
+          );
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -37,13 +131,29 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
+      String title = _titleController.text.trim();
+      DateTime? dueDate = _selectedDate;
+      TaskPriority priority = _selectedPriority;
+      List<String> tags = List.from(_tags);
+
+      // Final NLP pass if auto-parsing is enabled to catch any unapplied chips
+      if (_isAutoParsing) {
+        final nlp = NLPService.parse(title);
+        title = nlp.title;
+        if (dueDate == null) dueDate = nlp.dueDate;
+        if (priority == TaskPriority.none) priority = nlp.priority;
+        for (final tag in nlp.tags) {
+          if (!tags.contains(tag)) tags.add(tag);
+        }
+      }
+
       context.read<TaskBloc>().add(
         AddTask(
-          title: _titleController.text.trim(),
+          title: title,
           description: _descriptionController.text.trim(),
-          priority: _selectedPriority,
-          dueDate: _selectedDate,
-          tags: _tags,
+          priority: priority,
+          dueDate: dueDate,
+          tags: tags,
           isRecurring: _selectedRecurrence != 'None',
           recurringPattern: _selectedRecurrence != 'None'
               ? _selectedRecurrence.toLowerCase()
@@ -136,6 +246,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     : null,
               ),
               const SizedBox(height: 12),
+
+              // ── AI Suggestions Bar ──
+              if (_suggestedDate != null ||
+                  _suggestedPriority != null ||
+                  _suggestedTags.isNotEmpty)
+                _buildAISuggestions(theme),
 
               // ── Description Field ──
               TextFormField(
@@ -377,6 +493,116 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAISuggestions(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withAlpha(15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primaryColor.withAlpha(30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 16,
+                color: AppTheme.primaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'AI Suggestions',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _isAutoParsing = !_isAutoParsing),
+                child: Icon(
+                  _isAutoParsing
+                      ? Icons.flash_on_rounded
+                      : Icons.flash_off_rounded,
+                  size: 16,
+                  color: AppTheme.primaryColor.withAlpha(100),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (_suggestedDate != null)
+                  _SuggestionChip(
+                    icon: Icons.calendar_today_rounded,
+                    label: DateFormat('MMM d, h:mm a').format(_suggestedDate!),
+                    onTap: () => _applySuggestion(date: _suggestedDate),
+                  ),
+                if (_suggestedPriority != null)
+                  _SuggestionChip(
+                    icon: Icons.flag_rounded,
+                    label: _suggestedPriority!.name.toUpperCase(),
+                    color: AppTheme.priorityColor(_suggestedPriority!.index),
+                    onTap: () => _applySuggestion(priority: _suggestedPriority),
+                  ),
+                ..._suggestedTags.map(
+                  (tag) => _SuggestionChip(
+                    icon: Icons.tag_rounded,
+                    label: tag,
+                    onTap: () => _applySuggestion(tag: tag),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _SuggestionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activeColor = color ?? AppTheme.primaryColor;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(icon, size: 14, color: activeColor),
+        label: Text(label),
+        onPressed: onTap,
+        labelStyle: theme.textTheme.bodySmall?.copyWith(
+          color: activeColor,
+          fontWeight: FontWeight.bold,
+        ),
+        backgroundColor: activeColor.withAlpha(20),
+        side: BorderSide(color: activeColor.withAlpha(50)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        visualDensity: VisualDensity.compact,
       ),
     );
   }
